@@ -15,7 +15,7 @@ const getComponentScope = (element) => {
  const getComponentState = (element) => {
     while (element.parentElement != null) {
         element = element.parentElement
-        if (element.state != null) return element.state;
+        if (element.State != null) return element.State;
     }
     return null;
 }

@@ -4,6 +4,7 @@ import exEventAttribute from "./ex-event-attribute.js";
 import attributeContainer from "./state/attribute-container.js";
 import { getComponentState, getComponentScope } from "./helpers/state-helpers.js";
 import { exceptionLogger } from "./helpers/exception-logger.js";
+import stateManager from "./state/state-manager.js";
 
 class exComponent extends HTMLElement {
     /**
@@ -12,6 +13,7 @@ class exComponent extends HTMLElement {
      * accessed via scope.
      */
     #scope = null;
+    /**@type {stateManager} */
     get scope() {
         return this.#scope || getComponentScope(this) || exceptionLogger("No scope found!");
     }
@@ -24,10 +26,12 @@ class exComponent extends HTMLElement {
      * accessed via state.
      */
     #state = null;
-    get state() {
+    /**@type {new() => import('./state/state-manager.js')} */
+    get State() {
         return this.#state || getComponentState(this) || exceptionLogger("No state found!");
     }
-    set state(value) {
+    /**@type {new() => import('./state/state-manager.js')} */
+    set State(value) {
         this.#state = value;
     }
 
@@ -35,8 +39,13 @@ class exComponent extends HTMLElement {
     #eventAttributes = []
     /** @type {Array<string>} */
     #exAttributeNames = [];
+
     constructor() {
         super();
+        
+    }
+
+    connectedCallback(){
         this.#activateAttributes();
     }
 
@@ -53,6 +62,7 @@ class exComponent extends HTMLElement {
             let attributeInstance = new attributeDef(this);
             if (attributeInstance instanceof exModifierAttribute) {
                 this.#modifierAttributes.push(attributeInstance);
+                attributeInstance.connectedCallback(this.State);
             } else if (attributeInstance instanceof exEventAttribute) {
                 this.#eventAttributes.push(attributeInstance);
             }

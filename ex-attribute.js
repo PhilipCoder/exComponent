@@ -1,8 +1,16 @@
 class exAttribute {
-    boundPaths={}
+    boundPaths = {}
     element = null
-    constructor(element){
+    constructor(element) {
         this.element = element;
+    }
+
+    connectedCallback(stateManager){
+
+    }
+
+    disconnectedCallback(stateManager){
+
     }
 }
 

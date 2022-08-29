@@ -1,12 +1,29 @@
 import stateProxy from "./state-proxy.js";
 import { Observable, Subject } from "rxjs";
+import deepProxy from "./state-proxy.js";
+
 
 class stateManager {
+    //Fields
+    #state = null;
+
     accessedPaths = null
     accessedObservable = new Subject()
     changedObservable = new Subject()
+    
+    //Properties
+    get State(){
+        return this.#state || (this.#state = this.getState());
+    }
+    set State(value){
+        this.#state = this.getState(value);
+        return true;
+    }
 
-    constructor() {
+    /** Gets a state proxy instance
+     * @param {Object} stateObj 
+     */
+    getState(stateObj = {}) {
         let that = this;
         const proxyManager = {
             get(target, key, receiver) {
@@ -15,7 +32,7 @@ class stateManager {
                 if (typeof val === 'object' && val !== null) {
                     return this.nest(val)
                 } else {
-                    that.accessedPaths && that.accessedPaths.push(this.path);
+                    that.accessedPaths && that.accessedPaths.push(this.path.join('.'));
                     return val
                 }
             },
@@ -24,18 +41,22 @@ class stateManager {
                     value = this.nest(val)
                 }
                 obj[prop] = val;
-                that.changedObservable.next(this.path);
+                that.changedObservable.next(this.path.join('.'));
             }
+        }
+        return deepProxy(stateObj, proxyManager);
+    }
+
+    GetAccessedPaths() {
+        let accessedPathsResult = [];
+        this.accessedPaths = [];
+        return () => {
+            accessedPathsResult =this.accessedPaths;
+            this.accessedPaths = null;
+            return accessedPathsResult;
         };
     }
 
-    getAccessedPaths() {
-        this.accessedPaths = [];
-        return new Promise((resolve, reject) => {
-            accessedPaths = this.accessedPaths;
-            this.accessedPaths = [];
-            resolve(accessedPaths);
-        });
-    }
-
 }
+
+export default stateManager;
