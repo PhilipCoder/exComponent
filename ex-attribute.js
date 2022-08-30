@@ -5,11 +5,11 @@ class exAttribute {
         this.element = element;
     }
 
-    connectedCallback(stateManager){
+    connectedCallback(){
 
     }
 
-    disconnectedCallback(stateManager){
+    disconnectedCallback(){
 
     }
 }

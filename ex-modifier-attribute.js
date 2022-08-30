@@ -1,30 +1,40 @@
 import exAttribute from "./ex-attribute.js";
 
-class exModifierAttribute extends exAttribute{
-     /**
-     * 
-     * @param {new() => import('./ex-component.js')} element 
-     * @param {*} binding 
-     */
-    constructor(element,binding){
+class exModifierAttribute extends exAttribute {
+    #boundPaths = new Set();
+    #boundPathObservable = null;
+    #boundPathSubscription = null;
+    constructor(element, binding) {
         super(element)
         this.binding = binding;
     }
 
-    connectedCallback(stateManager){
-        
+    disconnectedCallback() {
+        this.#boundPathSubscription.unsubscribe();
     }
 
-
-    /**
-     * @override
-     * @param {*} data 
-     */
-    onDataModifier(data){
+    dataCallback(data) {
     }
 
-    getData(){
-        let state = this.element.state.State
+    #onDataChanged(){
+        this.dataCallback(this.getData(this.element.state.state));
+    }
+
+    connectedCallback(stateManager) {
+        let pathFunc = stateManager.GetAccessedPaths();
+        let boundValue = getData(stateManager.state);
+        let paths = pathFunc();
+        paths.forEach(path => {
+            path.split(".").
+                map((x, index, ar) => `${ar.filter((a, b) => b < index).join(".")}${index ? "." : ""}${x}`).
+                forEach(pathSegment => this.#boundPaths.add(pathSegment))
+        });
+        this.dataCallback(boundValue);
+        this.#boundPathObservable = stateManager.changedObservable.pipe(filter(path=>this.#boundPaths.has(path)));
+        this.#boundPathSubscription = this.#boundPathObservable.subscribe(this.#onDataChanged);
+    }
+
+    getData(state) {
         return Function(`return ${this.binding}`)();
     }
 }

@@ -1,5 +1,5 @@
 import stateProxy from "./state-proxy.js";
-import { Observable, Subject } from "rxjs";
+import { Subject } from "../rxjs/rxjs.js";
 import deepProxy from "./state-proxy.js";
 
 
@@ -12,10 +12,10 @@ class stateManager {
     changedObservable = new Subject()
     
     //Properties
-    get State(){
+    get state(){
         return this.#state || (this.#state = this.getState());
     }
-    set State(value){
+    set state(value){
         this.#state = this.getState(value);
         return true;
     }

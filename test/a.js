@@ -93,15 +93,15 @@ describe('state-proxy', function () {
         }
       };
       var manager = new stateManager();
-      manager.State = toTest;
-      let state =  manager.State;
+      manager.state = toTest;
+      let state =  manager.state;
 
       let accesedPaths = manager.GetAccessedPaths();
       let secondKey = state.SessionVariables.Values[1].value;
       let secondKsey = state.SessionVariables.Values[0].value;
 
       let result = accesedPaths();
-
+     let resultJ = JSON.stringify(result);
     })
   });
 });

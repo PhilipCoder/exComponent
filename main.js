@@ -1,26 +1,25 @@
-import deepProxy from "./state/state-proxy.js";
+import { Subject,Observable } from "./rxjs/rxjs.js";
 
-let toTest = {
-    SessionVariables: {
-        Values: [
-            { key: "one", value: "hat" },
-            { key: "two", value: "shirt" }
-        ]
-    }
-};
-
-let accessedPaths = [];
-
-let testProxy = deepProxy(toTest, {
-    get(target, key, receiver) {
-        const val = Reflect.get(target, key, receiver);
-        if (typeof val === 'object' && val !== null) {
-            return this.nest({})
-        } else {
-            accessedPaths.push(this.path);
-            return val
-        }
-    }
-});
-
-console.log(testProxy);
+const observable = new Observable((subscriber) => {
+    subscriber.next(1);
+    subscriber.next(2);
+    subscriber.next(3);
+    setTimeout(() => {
+      subscriber.next(4);
+      subscriber.complete();
+    }, 1000);
+  });
+   
+  console.log('just before subscribe');
+  observable.subscribe({
+    next(x) {
+      console.log('got value ' + x);
+    },
+    error(err) {
+      console.error('something wrong occurred: ' + err);
+    },
+    complete() {
+      console.log('done');
+    },
+  });
+  console.log('just after subscribe');

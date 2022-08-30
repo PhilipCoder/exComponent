@@ -4,45 +4,31 @@ import exEventAttribute from "./ex-event-attribute.js";
 import attributeContainer from "./state/attribute-container.js";
 import { getComponentState, getComponentScope } from "./helpers/state-helpers.js";
 import { exceptionLogger } from "./helpers/exception-logger.js";
-import stateManager from "./state/state-manager.js";
 
 class exComponent extends HTMLElement {
-    /**
-     * Scope
-     * This is used for non-observable code such as methods and values 
-     * accessed via scope.
-     */
     #scope = null;
-    /**@type {stateManager} */
+    #state = null;
+    #exAttributeNames = [];
+    #eventAttributes = []
+    #modifierAttributes = []
+
+  
     get scope() {
         return this.#scope || getComponentScope(this) || exceptionLogger("No scope found!");
     }
     set scope(value) {
         this.#scope = value;
     }
-    /**
-     * State
-     * This is used for observable values
-     * accessed via state.
-     */
-    #state = null;
-    /**@type {new() => import('./state/state-manager.js')} */
-    get State() {
+   
+    get state() {
         return this.#state || getComponentState(this) || exceptionLogger("No state found!");
     }
-    /**@type {new() => import('./state/state-manager.js')} */
-    set State(value) {
+    set state(value) {
         this.#state = value;
     }
 
-    #modifierAttributes = []
-    #eventAttributes = []
-    /** @type {Array<string>} */
-    #exAttributeNames = [];
-
     constructor() {
         super();
-        
     }
 
     connectedCallback(){
@@ -62,11 +48,16 @@ class exComponent extends HTMLElement {
             let attributeInstance = new attributeDef(this);
             if (attributeInstance instanceof exModifierAttribute) {
                 this.#modifierAttributes.push(attributeInstance);
-                attributeInstance.connectedCallback(this.State);
+                attributeInstance.connectedCallback(this.state);
             } else if (attributeInstance instanceof exEventAttribute) {
                 this.#eventAttributes.push(attributeInstance);
             }
         }
+    }
+
+    disconnectedCallback() {
+        this.#modifierAttributes.forEach(x=>x.disconnectedCallback());
+        this.#eventAttributes.forEach(x=>x.disconnectedCallback());
     }
 }
 
