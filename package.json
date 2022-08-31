@@ -5,5 +5,8 @@
     "mocha": "^10.0.0",
     "rxjs": "^7.5.6",
     "serve-static": "^1.15.0"
+  },
+  "devDependencies": {
+    "rollup-plugin-node-resolve": "^5.2.0"
   }
 }
