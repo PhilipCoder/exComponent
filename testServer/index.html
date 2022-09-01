@@ -12,11 +12,11 @@
 </head>
 
 <body>
-    <ex-div ex-state="./demo.js">
+    <ex-div ex-state="./state.js" ex-scope="./scope.js">
         <h1>Hello World</h1>
-        <ex-div ex-bind="state.name">
-
+        <ex-div ex-bind="state.name" ex-on-click="scope.alertMe()">
         </ex-div>
+
     </ex-div>
 </body>
 

@@ -4,7 +4,7 @@ class exEventAttribute extends exAttribute {
     runEvent() {
         let state = this.element.state.state;
         let scope = this.element.scope;
-        Function(`${this.binding}`)();
+        Function("state", "scope", `${this.binding}`)(state, scope);
     }
 }
 

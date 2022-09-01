@@ -7,7 +7,6 @@ import { exceptionLogger } from "./helpers/exception-logger.js";
 class exComponent extends HTMLElement {
     #scope = null;
     #state = null;
-    #exAttributeNames = [];
     #eventAttributes = []
     #modifierAttributes = []
     #otherAttributes = []
@@ -35,21 +34,27 @@ class exComponent extends HTMLElement {
     }
 
     async #activateAttributes() {
-        this.#exAttributeNames = [...this.attributes].map(x=>x.name).filter(x => x.startsWith("ex-"));
+        let elementAttributes = [...this.attributes].filter(x => x.name.startsWith("ex-")).map(x => ({
+            name: x.name,
+            value: x.value
+        }));
+        let attributeDefinitions = elementAttributes.
+            filter(x => {
+                if (attributeContainer.getAttribute(x.name)) {
+                    return true;
+                }
+                exceptionLogger.logError(`Attribute named ${x.name} is not found!`);
+                return false;
+            }).
+            map(x => { x.attributeDef = attributeContainer.getAttribute(x.name); return x }).
+            sort((a,b)=>b.attributeDef.Priority - a.attributeDef.Priority);
 
-        for (let attributeIndex in this.#exAttributeNames) {
-            let attributeName = this.#exAttributeNames[attributeIndex];
-            let attributeDef = attributeContainer.getAttribute(attributeName);
-            if (!attributeDef) {
-                console.log(`Attribute named ${attributeName} is not found!`);
-                return;
-            }
-            let attributeValue = this.getAttribute(attributeName);
-            let attributeInstance = new attributeDef(this, attributeValue);
+        for (let attributeDef of attributeDefinitions) {
+            let attributeInstance = new attributeDef.attributeDef(this, attributeDef.value);
 
             attributeInstance instanceof exModifierAttribute ?
                 this.#modifierAttributes.push(attributeInstance) :
-            attributeInstance instanceof exEventAttribute ?
+                attributeInstance instanceof exEventAttribute ?
                     this.#eventAttributes.push(attributeInstance) :
                     this.#otherAttributes.push(attributeInstance);
 

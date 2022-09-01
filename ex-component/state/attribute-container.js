@@ -2,6 +2,7 @@ import exAttribute from "../ex-attribute.js";
 import exScope from "../../ex-attributes/ex-scope.js";
 import exState from "../../ex-attributes/ex-state.js";
 import exBind from "../../ex-attributes/ex-bind.js";
+import exOnClick from "../../ex-attributes/ex-on-click";
 
 class _attributeContainer {
     #registeredAttributes = new Map();
@@ -30,5 +31,6 @@ const attributeContainer = new _attributeContainer();
 attributeContainer.registerAttribute("ex-scope", exScope);
 attributeContainer.registerAttribute("ex-state", exState);
 attributeContainer.registerAttribute("ex-bind", exBind);
+attributeContainer.registerAttribute("ex-on-click", exOnClick);
 
 export default attributeContainer;

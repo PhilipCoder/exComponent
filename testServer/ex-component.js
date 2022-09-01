@@ -919,12 +919,12 @@ class stateManager {
     accessedPaths = null
     accessedObservable = new Subject()
     changedObservable = new Subject()
-    
+
     //Properties
-    get state(){
+    get state() {
         return this.#state || (this.#state = this.getState());
     }
-    set state(value){
+    set state(value) {
         this.#state = this.getState(value);
         return true;
     }
@@ -934,6 +934,9 @@ class stateManager {
      */
     getState(stateObj = {}) {
         let that = this;
+        if (this.#state) {
+            Object.keys(this.#state).forEach(x => that.changedObservable.next(x));
+        }
         const proxyManager = {
             get(target, key, receiver) {
                 const val = Reflect.get(target, key, receiver);
@@ -945,12 +948,13 @@ class stateManager {
                     return val
                 }
             },
-            set(obj, prop, value) {
+            set(obj, prop, val) {
                 if (typeof val === 'object' && val !== null) {
-                    this.nest(val);
+                    value = this.nest(val);
                 }
                 obj[prop] = val;
                 that.changedObservable.next(this.path.join('.'));
+                return true;
             }
         };
         return DeepProxy(stateObj, proxyManager);
@@ -960,7 +964,7 @@ class stateManager {
         let accessedPathsResult = [];
         this.accessedPaths = [];
         return () => {
-            accessedPathsResult =this.accessedPaths;
+            accessedPathsResult = this.accessedPaths;
             this.accessedPaths = null;
             return accessedPathsResult;
         };
@@ -971,6 +975,8 @@ class stateManager {
 class exAttribute {
     boundPaths = {}
     element = null
+    static Priority = 0;
+    
     constructor(element, binding) {
         this.element = element;
         this.binding = binding;
@@ -1012,7 +1018,7 @@ class exModifierAttribute extends exAttribute {
         });
         this.dataCallback(boundValue);
         this.#boundPathObservable = stateManager.changedObservable.pipe(filter(path => this.#boundPaths.has(path)));
-        this.#boundPathSubscription = this.#boundPathObservable.subscribe(this.#onDataChanged);
+        this.#boundPathSubscription = this.#boundPathObservable.subscribe((data)=>this.#onDataChanged(data));
     }
 
     getData(state) {
@@ -1022,31 +1028,45 @@ class exModifierAttribute extends exAttribute {
 
 class exEventAttribute extends exAttribute {
     runEvent() {
-        this.element.state.state;
-        this.element.scope;
-        Function(`${this.binding}`)();
+        let state = this.element.state.state;
+        let scope = this.element.scope;
+        Function("state", "scope", `${this.binding}`)(state, scope);
     }
 }
 
 class exScope extends exAttribute {
+    static Priority = 1;
     async connectedCallback() {
         let module = await Function(`return import('${this.binding}')`)();
-        if (Object.keys(module).length === 0){
+        if (Object.keys(module).length === 0) {
             throw `Module ${this.binding} does not provide any exports`;
         }
-        
-        module = module[Object.keys[0]];
-        if (!!module){
+
+        let moduleName = Object.keys(module)[0];
+        module = module[moduleName];
+        if (!module) {
             throw `Module ${this.binding} has an invalid export`;
         }
 
-        module = typeof module === "function" ? new module() : module;
+        let state = this.element.state && this.element.state.state;
+        module = await this.getModuleInstance(module, state);
 
         this.element.scope = module;
+    }
+
+    async getModuleInstance(moduleDefinition,state) {
+        if (typeof moduleDefinition === "function") {
+            if (moduleDefinition.prototype) {
+                return new moduleDefinition(state);
+            }
+            return await moduleDefinition(state);
+        }
+        return moduleDefinition;
     }
 }
 
 class exState extends exAttribute {
+    static Priority = 3;
     async connectedCallback() {
         let innerHTML = this.element.innerHTML;
         this.element.innerHTML = "";
@@ -1060,18 +1080,38 @@ class exState extends exAttribute {
             throw `Module ${this.binding} has an invalid export`;
         }
 
-        module = typeof module === "function" ? new module() : module;
+        module = await this.getModuleInstance(module);
 
         let stateManagerInstance = new stateManager();
         stateManagerInstance.state = module;
         this.element.state = stateManagerInstance;
         this.element.innerHTML = innerHTML;
     }
+
+    async getModuleInstance(moduleDefinition){
+        if (typeof moduleDefinition === "function"){
+            if (moduleDefinition.prototype){
+                return new moduleDefinition();
+            }
+            return await moduleDefinition();
+        }
+        return moduleDefinition;
+    }
 }
 
 class exBind extends exModifierAttribute {
     dataCallback(data) {
         this.element.innerHTML = data;
+    }
+}
+
+class onClick extends exEventAttribute{
+    connectedCallback(){
+        this.element.addEventListener("click", ()=>{this.runEvent();});
+    }
+
+    disconnectedCallback(){
+
     }
 }
 
@@ -1102,6 +1142,7 @@ const attributeContainer = new _attributeContainer();
 attributeContainer.registerAttribute("ex-scope", exScope);
 attributeContainer.registerAttribute("ex-state", exState);
 attributeContainer.registerAttribute("ex-bind", exBind);
+attributeContainer.registerAttribute("ex-on-click", onClick);
 
 /**
  * @param {HTMLElement} element 
@@ -1125,10 +1166,15 @@ const getComponentScope = (element) => {
     return null;
 };
 
+const exceptionLogger = {
+    logError: (exception) => {
+        throw exception;
+    }
+};
+
 class exComponent extends HTMLElement {
     #scope = null;
     #state = null;
-    #exAttributeNames = [];
     #eventAttributes = []
     #modifierAttributes = []
     #otherAttributes = []
@@ -1156,21 +1202,27 @@ class exComponent extends HTMLElement {
     }
 
     async #activateAttributes() {
-        this.#exAttributeNames = [...this.attributes].map(x=>x.name).filter(x => x.startsWith("ex-"));
+        let elementAttributes = [...this.attributes].filter(x => x.name.startsWith("ex-")).map(x => ({
+            name: x.name,
+            value: x.value
+        }));
+        let attributeDefinitions = elementAttributes.
+            filter(x => {
+                if (attributeContainer.getAttribute(x.name)) {
+                    return true;
+                }
+                exceptionLogger.logError(`Attribute named ${x.name} is not found!`);
+                return false;
+            }).
+            map(x => { x.attributeDef = attributeContainer.getAttribute(x.name); return x }).
+            sort((a,b)=>b.attributeDef.Priority - a.attributeDef.Priority);
 
-        for (let attributeIndex in this.#exAttributeNames) {
-            let attributeName = this.#exAttributeNames[attributeIndex];
-            let attributeDef = attributeContainer.getAttribute(attributeName);
-            if (!attributeDef) {
-                console.log(`Attribute named ${attributeName} is not found!`);
-                return;
-            }
-            let attributeValue = this.getAttribute(attributeName);
-            let attributeInstance = new attributeDef(this, attributeValue);
+        for (let attributeDef of attributeDefinitions) {
+            let attributeInstance = new attributeDef.attributeDef(this, attributeDef.value);
 
             attributeInstance instanceof exModifierAttribute ?
                 this.#modifierAttributes.push(attributeInstance) :
-            attributeInstance instanceof exEventAttribute ?
+                attributeInstance instanceof exEventAttribute ?
                     this.#eventAttributes.push(attributeInstance) :
                     this.#otherAttributes.push(attributeInstance);
 

@@ -2,6 +2,7 @@ import exAttribute from "../ex-component/ex-attribute.js";
 import stateManager from "../ex-component/state/state-manager.js";
 
 class exState extends exAttribute {
+    static Priority = 3;
     async connectedCallback() {
         let innerHTML = this.element.innerHTML;
         this.element.innerHTML = "";
@@ -15,12 +16,22 @@ class exState extends exAttribute {
             throw `Module ${this.binding} has an invalid export`;
         }
 
-        module = typeof module === "function" ? new module() : module;
+        module = await this.getModuleInstance(module);
 
         let stateManagerInstance = new stateManager();
         stateManagerInstance.state = module;
         this.element.state = stateManagerInstance;
         this.element.innerHTML = innerHTML;
+    }
+
+    async getModuleInstance(moduleDefinition){
+        if (typeof moduleDefinition === "function"){
+            if (moduleDefinition.prototype){
+                return new moduleDefinition();
+            }
+            return await moduleDefinition();
+        }
+        return moduleDefinition;
     }
 }
 

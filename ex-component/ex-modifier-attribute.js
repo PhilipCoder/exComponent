@@ -27,7 +27,7 @@ class exModifierAttribute extends exAttribute {
         });
         this.dataCallback(boundValue);
         this.#boundPathObservable = stateManager.changedObservable.pipe(filter(path => this.#boundPaths.has(path)));
-        this.#boundPathSubscription = this.#boundPathObservable.subscribe(this.#onDataChanged);
+        this.#boundPathSubscription = this.#boundPathObservable.subscribe((data)=>this.#onDataChanged(data));
     }
 
     getData(state) {

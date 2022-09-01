@@ -9,12 +9,12 @@ class stateManager {
     accessedPaths = null
     accessedObservable = new Subject()
     changedObservable = new Subject()
-    
+
     //Properties
-    get state(){
+    get state() {
         return this.#state || (this.#state = this.getState());
     }
-    set state(value){
+    set state(value) {
         this.#state = this.getState(value);
         return true;
     }
@@ -24,6 +24,9 @@ class stateManager {
      */
     getState(stateObj = {}) {
         let that = this;
+        if (this.#state) {
+            Object.keys(this.#state).forEach(x => that.changedObservable.next(x));
+        }
         const proxyManager = {
             get(target, key, receiver) {
                 const val = Reflect.get(target, key, receiver);
@@ -35,12 +38,13 @@ class stateManager {
                     return val
                 }
             },
-            set(obj, prop, value) {
+            set(obj, prop, val) {
                 if (typeof val === 'object' && val !== null) {
                     value = this.nest(val)
                 }
                 obj[prop] = val;
                 that.changedObservable.next(this.path.join('.'));
+                return true;
             }
         }
         return deepProxy(stateObj, proxyManager);
@@ -50,7 +54,7 @@ class stateManager {
         let accessedPathsResult = [];
         this.accessedPaths = [];
         return () => {
-            accessedPathsResult =this.accessedPaths;
+            accessedPathsResult = this.accessedPaths;
             this.accessedPaths = null;
             return accessedPathsResult;
         };
