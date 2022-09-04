@@ -12,9 +12,9 @@
 </head>
 
 <body>
-    <div is="ex-div" ex-state="./state.js" ex-scope="./scope.js">
+    <div is="ex-div" ex-state="{state:'./state.js'}" ex-scope="{scope:'./scope.js'}">
         <h1>Hello World</h1>
-        <div is="ex-div" ex-bind="state.name" >
+        <div is="ex-div" ex-bind="state.person.peronalDetails.name" >
         </div>
         <button is="ex-button" ex-on-click="scope.alertMe()">Append surname</button>
     </div>

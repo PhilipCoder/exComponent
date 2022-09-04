@@ -276,17 +276,17 @@ function reportUnhandledError(err) {
 
 function noop() { }
 
-var context = null;
+var context$1 = null;
 function errorContext(cb) {
     if (config.useDeprecatedSynchronousErrorHandling) {
-        var isRoot = !context;
+        var isRoot = !context$1;
         if (isRoot) {
-            context = { errorThrown: false, error: null };
+            context$1 = { errorThrown: false, error: null };
         }
         cb();
         if (isRoot) {
-            var _a = context, errorThrown = _a.errorThrown, error = _a.error;
-            context = null;
+            var _a = context$1, errorThrown = _a.errorThrown, error = _a.error;
+            context$1 = null;
             if (errorThrown) {
                 throw error;
             }
@@ -913,7 +913,12 @@ function DeepProxy(rootTarget, traps, options) {
 }
 
 class stateManager {
+    name = ""
+    constructor(name) {
+        this.name = name;
+    }
     //Fields
+    boundProp = "state"
     #state = null;
 
     accessedPaths = null
@@ -940,11 +945,13 @@ class stateManager {
         const proxyManager = {
             get(target, key, receiver) {
                 const val = Reflect.get(target, key, receiver);
-                that.accessedObservable.next(this.path);
+                let path = [...this.path, key];
+                that.accessedObservable.next(path);
                 if (typeof val === 'object' && val !== null) {
+                    //that.accessedPaths && that.accessedPaths.push([...this.path, key].join('.'));
                     return this.nest(val)
                 } else {
-                    that.accessedPaths && that.accessedPaths.push(this.path.join('.'));
+                    that.accessedPaths && that.accessedPaths.push(path.join('.'));
                     return val
                 }
             },
@@ -957,7 +964,7 @@ class stateManager {
                 return true;
             }
         };
-        return DeepProxy(stateObj, proxyManager);
+        return DeepProxy(stateObj, proxyManager);//, { path: "state" }
     }
 
     GetAccessedPaths() {
@@ -982,6 +989,10 @@ class exAttribute {
         this.binding = binding;
     }
 
+    get context(){
+        return this.element.context;
+    }
+
     connectedCallback(){
 
     }
@@ -991,28 +1002,6 @@ class exAttribute {
     }
 }
 
-/**
- * @param {HTMLElement} element 
- */
-const getComponentScope = (element) => {
-    while (element.parentElement != null) {
-        element = element.parentElement;
-        if (element.scope != null) return element.scope;
-    }
-    return null;
-};
-
-/**
- * @param {HTMLElement} element 
- */
- const getComponentState = (element) => {
-    while (element.parentElement != null) {
-        element = element.parentElement;
-        if (element.state != null) return element.state;
-    }
-    return null;
-};
-
 const exceptionLogger = {
     logError: (exception) => {
         throw exception;
@@ -1021,73 +1010,82 @@ const exceptionLogger = {
 
 class exModifierAttribute extends exAttribute {
     #boundPaths = new Set();
-    #boundPathObservable = null;
-    #boundPathSubscription = null;
+    #boundPathObservables = [];
+    #boundPathSubscriptions = [];
 
     disconnectedCallback() {
-        this.#boundPathSubscription.unsubscribe();
+        this.#boundPathSubscriptions.forEach(x=>x.unsubscribe());
     }
 
     dataCallback(data) {
     }
 
     #onDataChanged() {
-        this.dataCallback(this.getData(this.element.state.state));
+        this.dataCallback(this.getData());
     }
 
-    connectedCallback(stateManager) {
-        let pathFunc = stateManager.GetAccessedPaths();
-        let boundValue = this.getData(stateManager.state);
-        let paths = pathFunc();
+    connectedCallback() {
+        let stateManagers = this.context.getOfType(stateManager);
+        let pathFuncs = stateManagers.map(x => ({ stateManager: x, paths: x.GetAccessedPaths() }));
+        let boundValue = this.getData();
+        
+        let paths = [];
+        pathFuncs.forEach(x => x.paths = x.paths());
+        pathFuncs.forEach(x => x.paths.forEach(y => paths.push(y)));
         paths.forEach(path => {
             path.split(".").
                 map((x, index, ar) => `${ar.filter((a, b) => b < index).join(".")}${index ? "." : ""}${x}`).
                 forEach(pathSegment => this.#boundPaths.add(pathSegment));
         });
         this.dataCallback(boundValue);
-        this.#boundPathObservable = stateManager.changedObservable.pipe(filter(path => this.#boundPaths.has(path)));
-        this.#boundPathSubscription = this.#boundPathObservable.subscribe((data)=>this.#onDataChanged(data));
+        pathFuncs = pathFuncs.filter(x => x.paths.length > 0);
+        this.#boundPathObservables = pathFuncs.map(x =>
+            x.stateManager.changedObservable.pipe(filter(path => this.#boundPaths.has(path)))
+        );
+        this.#boundPathSubscriptions = this.#boundPathObservables.map(x=>x.subscribe((data) => this.#onDataChanged(data)));
     }
 
-    getData(state) {
-        return Function("state", `return ${this.binding}`)(state);
+    getData() {
+        return this.context.executeScopedExpression(this.binding);
     }
 }
 
 class exEventAttribute extends exAttribute {
     runEvent() {
-        let state = this.element.state.state;
-        let scope = this.element.scope;
-        Function("state", "scope", `${this.binding}`)(state, scope);
+        this.context.executeScopedExpression(this.binding);
     }
 }
 
 class exScope extends exAttribute {
     static Priority = 1;
     async connectedCallback() {
-        let module = await Function(`return import('${this.binding}')`)();
-        if (Object.keys(module).length === 0) {
-            throw `Module ${this.binding} does not provide any exports`;
+        let scopeObj = await Function(`return ${this.binding}`)();
+        for (let scopeVarName in scopeObj) {
+            let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();
+            if (Object.keys(module).length === 0) {
+                throw `Module ${this.binding} does not provide any exports`;
+            }
+
+            let moduleName = Object.keys(module)[0];
+            module = module[moduleName];
+            if (!module) {
+                throw `Module ${this.binding} has an invalid export`;
+            }
+
+            module = await this.getModuleInstance(module);
+
+            this.element.createContext();
+            this.element.context.addVariable(scopeVarName, module);
         }
-
-        let moduleName = Object.keys(module)[0];
-        module = module[moduleName];
-        if (!module) {
-            throw `Module ${this.binding} has an invalid export`;
-        }
-
-        let state = this.element.state && this.element.state.state;
-        module = await this.getModuleInstance(module, state);
-
-        this.element.scope = module;
     }
 
-    async getModuleInstance(moduleDefinition,state) {
+    //Module parameters should be in the following format: ({scope1, scope, state})
+    async getModuleInstance(moduleDefinition) {
         if (typeof moduleDefinition === "function") {
             if (moduleDefinition.prototype) {
-                return new moduleDefinition(state);
+                return new moduleDefinition(this.context?.getScopedVariablesObj() || {});
             }
-            return await moduleDefinition(state);
+            return await moduleDefinition(this.context?.getScopedVariablesObj() || {});
         }
         return moduleDefinition;
     }
@@ -1098,30 +1096,34 @@ class exState extends exAttribute {
     async connectedCallback() {
         let innerHTML = this.element.innerHTML;
         this.element.innerHTML = "";
-        let module = await Function(`return import('${this.binding}')`)();
-        if (Object.keys(module).length === 0){
-            throw `Module ${this.binding} does not provide any exports`;
-        }
-        let moduleName = Object.keys(module)[0];
-        module = module[moduleName];
-        if (!module){
-            throw `Module ${this.binding} has an invalid export`;
-        }
+        let scopeObj = await Function(`return ${this.binding}`)();
+        for (let scopeVarName in scopeObj) {
+            let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();
+            if (Object.keys(module).length === 0) {
+                throw `Module ${this.binding} does not provide any exports`;
+            }
+            let moduleName = Object.keys(module)[0];
+            module = module[moduleName];
+            if (!module) {
+                throw `Module ${this.binding} has an invalid export`;
+            }
 
-        module = await this.getModuleInstance(module);
+            module = await this.getModuleInstance(module);
 
-        let stateManagerInstance = new stateManager();
-        stateManagerInstance.state = module;
-        this.element.state = stateManagerInstance;
+            let stateManagerInstance = new stateManager(scopeVarName);
+            stateManagerInstance.state = module;
+            this.element.createContext();
+            this.element.context.addVariable(scopeVarName, stateManagerInstance);
+        }
         this.element.innerHTML = innerHTML;
     }
 
-    async getModuleInstance(moduleDefinition){
-        if (typeof moduleDefinition === "function"){
-            if (moduleDefinition.prototype){
-                return new moduleDefinition();
+    async getModuleInstance(moduleDefinition) {
+        if (typeof moduleDefinition === "function") {
+            if (moduleDefinition.prototype) {
+                return new moduleDefinition(this.context?.getScopedVariablesObj() || {});
             }
-            return await moduleDefinition();
+            return await moduleDefinition(this.context?.getScopedVariablesObj() || {});
         }
         return moduleDefinition;
     }
@@ -1172,28 +1174,30 @@ attributeContainer.registerAttribute("ex-state", exState);
 attributeContainer.registerAttribute("ex-bind", exBind);
 attributeContainer.registerAttribute("ex-on-click", onClick);
 
+// import { getComponentState, getComponentScope } from "./state-helpers.js";
+
 class elementAttributeManager{
 
-    #scope = null;
-    #state = null;
+    // #scope = null;
+    // #state = null;
     #eventAttributes = []
     #modifierAttributes = []
     #otherAttributes = []
 
-    getState(element){
-        return this.#state || getComponentState(element) || null;
-    }
+    // getState(element){
+    //     return this.#state || getComponentState(element) || null;
+    // }
 
-    setState(state){
-        this.#state = state;
-    }
+    // setState(state){
+    //     this.#state = state;
+    // }
 
-    getScope(element){
-        return this.#scope || getComponentScope(element) || null;
-    }
-    setScope(value){
-        this.#scope = value;
-    }
+    // getScope(element){
+    //     return this.#scope || getComponentScope(element) || null;
+    // }
+    // setScope(value){
+    //     this.#scope = value;
+    // }
 
     disconnectedCallback(element) {
         this.#modifierAttributes.forEach(x => x.disconnectedCallback());
@@ -1226,13 +1230,108 @@ class elementAttributeManager{
                 this.#eventAttributes.push(attributeInstance) :
                 this.#otherAttributes.push(attributeInstance);
 
-            await attributeInstance.connectedCallback(element.state);
+            await attributeInstance.connectedCallback(element.context);
         }
+    }
+}
+
+/**
+ * @param {HTMLElement} element 
+ */
+// const getComponentScope = (element) => {
+//     while (element.parentElement != null) {
+//         element = element.parentElement
+//         if (element.scope != null) return element.scope;
+//     }
+//     return null;
+// }
+
+// /**
+//  * @param {HTMLElement} element 
+//  */
+//  const getComponentState = (element) => {
+//     while (element.parentElement != null) {
+//         element = element.parentElement
+//         if (element.state != null) return element.state;
+//     }
+//     return null;
+// }
+
+const getComponentContext = (element) => {
+    while (element.parentElement != null) {
+        element = element.parentElement;
+        if (element.context != null) return element.context;
+    }
+    return null;
+};
+
+/**
+ * @param {Array} array 
+ * @param (Function)} keyFunction 
+ * @param {Function} valueFunction 
+ */
+const arrayToObject = (array, keyFunction, valueFunction)=>{
+    let result = {};
+    array.forEach(x=>{
+        result[keyFunction(x)] = valueFunction(x);
+    });
+    return result;
+};
+
+/**
+ * The context class is the class  that should contain
+ */
+class context {
+    scopedVariables = [];
+    constructor(scopedVariables = []) {
+        this.scopedVariables = scopedVariables;
+    }
+    addVariable(name, value) {
+        if (typeof value === "string" || typeof value === "number" || typeof value === "undefined") {
+            throw "Invalid context type applied";
+        }
+        this.scopedVariables.push({ name, value });
+    }
+
+    getVariable(name) {
+        return this.scopedVariables.filter(x => x.name == name)[0]?.value;
+    }
+
+    getScopedVariablesObj() {
+        return arrayToObject(this.scopedVariables, (x) => x.name, (x) => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
+    }
+
+    executeScopedExpression(expression) {
+        let scopeNames = this.scopedVariables.map(x => x.name);
+        let scopeValues = this.scopedVariables.map(x => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
+        return Function(...scopeNames, `return ${expression}`)(...scopeValues);
+    }
+
+    executeScopedStatement(expression) {
+        let scopeNames = this.scopedVariables.map(x => x.name);
+        let scopeValues = this.scopedVariables.map(x => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
+        return Function(...scopeNames, `${expression}`)(...scopeValues);
+    }
+
+    getOfType(type) {
+        return this.scopedVariables.filter(x => x.value instanceof type).map(x => x.value);
+    }
+
+    getScopedVariables() {
+        return this.scopedVariables;
     }
 }
 
 class exComponent //extends HTMLElement 
 {
+
+    get context() {
+        return this._context || getComponentContext(this) || null;
+    }
+    set context(value) {
+        this._context = this._context || value;
+    }
+
     get attributeManager() {
         this._attributeManager = this._attributeManager || new elementAttributeManager();
         return this._attributeManager;
@@ -1242,19 +1341,30 @@ class exComponent //extends HTMLElement
         this._attributeManager = value;
     }
 
-    get scope() {
-        return this.attributeManager.getScope(this);
-    }
-    set scope(value) {
-        this.attributeManager.setScope(value);
+    get hasContext() {
+        return !!this._context;
     }
 
-    get state() {
-        return this.attributeManager.getState(this);
+    createContext() {
+        if (!this._context) {
+            let parentScope = this.context?.scopedVariables || [];
+            this._context = new context(parentScope);
+        }
     }
-    set state(value) {
-        this.attributeManager.setState(value);
-    }
+
+    // get scope() {
+    //     return this.attributeManager.getScope(this);
+    // }
+    // set scope(value) {
+    //     this.attributeManager.setScope(value);
+    // }
+
+    // get state() {
+    //     return this.attributeManager.getState(this);
+    // }
+    // set state(value) {
+    //     this.attributeManager.setState(value);
+    // }
 
     async connectedCallback() {
         await this.attributeManager.connectedCallback(this);
@@ -1266,8 +1376,8 @@ class exComponent //extends HTMLElement
 
     static InheritFrom(classDef) {
         Object.getOwnPropertyNames(exComponent.prototype).
-        filter(x => x !== "constructor").
-        forEach(x => Object.defineProperty(classDef.prototype, x, Object.getOwnPropertyDescriptor(exComponent.prototype, x)));
+            filter(x => x !== "constructor").
+            forEach(x => Object.defineProperty(classDef.prototype, x, Object.getOwnPropertyDescriptor(exComponent.prototype, x)));
         return classDef;
     }
 }

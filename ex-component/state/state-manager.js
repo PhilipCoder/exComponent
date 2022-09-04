@@ -3,7 +3,12 @@ import deepProxy from "./state-proxy.js";
 
 
 class stateManager {
+    name = ""
+    constructor(name) {
+        this.name = name;
+    }
     //Fields
+    boundProp = "state"
     #state = null;
 
     accessedPaths = null
@@ -30,11 +35,13 @@ class stateManager {
         const proxyManager = {
             get(target, key, receiver) {
                 const val = Reflect.get(target, key, receiver);
-                that.accessedObservable.next(this.path);
+                let path = [...this.path, key];
+                that.accessedObservable.next(path);
                 if (typeof val === 'object' && val !== null) {
+                    //that.accessedPaths && that.accessedPaths.push([...this.path, key].join('.'));
                     return this.nest(val)
                 } else {
-                    that.accessedPaths && that.accessedPaths.push(this.path.join('.'));
+                    that.accessedPaths && that.accessedPaths.push(path.join('.'));
                     return val
                 }
             },
@@ -47,7 +54,7 @@ class stateManager {
                 return true;
             }
         }
-        return deepProxy(stateObj, proxyManager);
+        return deepProxy(stateObj, proxyManager);//, { path: "state" }
     }
 
     GetAccessedPaths() {

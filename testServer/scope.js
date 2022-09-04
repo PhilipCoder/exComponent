@@ -1,7 +1,7 @@
-const myScope = async (state) => {
+const myScope = async ({ state }) => {
     return {
-        alertMe:()=>{
-            state.name = state.name+"schoeman";
+        alertMe: () => {
+            state.person.peronalDetails.name = state.person.peronalDetails.name + "schoeman";
         }
 
     };

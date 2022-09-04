@@ -6,30 +6,34 @@ class exState extends exAttribute {
     async connectedCallback() {
         let innerHTML = this.element.innerHTML;
         this.element.innerHTML = "";
-        let module = await Function(`return import('${this.binding}')`)();
-        if (Object.keys(module).length === 0){
-            throw `Module ${this.binding} does not provide any exports`;
-        }
-        let moduleName = Object.keys(module)[0];
-        module = module[moduleName];
-        if (!module){
-            throw `Module ${this.binding} has an invalid export`;
-        }
+        let scopeObj = await Function(`return ${this.binding}`)();
+        for (let scopeVarName in scopeObj) {
+            let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();
+            if (Object.keys(module).length === 0) {
+                throw `Module ${this.binding} does not provide any exports`;
+            }
+            let moduleName = Object.keys(module)[0];
+            module = module[moduleName];
+            if (!module) {
+                throw `Module ${this.binding} has an invalid export`;
+            }
 
-        module = await this.getModuleInstance(module);
+            module = await this.getModuleInstance(module);
 
-        let stateManagerInstance = new stateManager();
-        stateManagerInstance.state = module;
-        this.element.state = stateManagerInstance;
+            let stateManagerInstance = new stateManager(scopeVarName);
+            stateManagerInstance.state = module;
+            this.element.createContext();
+            this.element.context.addVariable(scopeVarName, stateManagerInstance);
+        }
         this.element.innerHTML = innerHTML;
     }
 
-    async getModuleInstance(moduleDefinition){
-        if (typeof moduleDefinition === "function"){
-            if (moduleDefinition.prototype){
-                return new moduleDefinition();
+    async getModuleInstance(moduleDefinition) {
+        if (typeof moduleDefinition === "function") {
+            if (moduleDefinition.prototype) {
+                return new moduleDefinition(this.context?.getScopedVariablesObj() || {});
             }
-            return await moduleDefinition();
+            return await moduleDefinition(this.context?.getScopedVariablesObj() || {});
         }
         return moduleDefinition;
     }

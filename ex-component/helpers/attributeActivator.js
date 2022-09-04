@@ -1,4 +1,4 @@
-import { getComponentState, getComponentScope } from "./state-helpers.js";
+// import { getComponentState, getComponentScope } from "./state-helpers.js";
 import { exceptionLogger } from "./exception-logger.js";
 import exModifierAttribute from "../ex-modifier-attribute.js";
 import exEventAttribute from "../ex-event-attribute.js";
@@ -6,26 +6,26 @@ import attributeContainer from "../state/attribute-container.js";
 
 class elementAttributeManager{
 
-    #scope = null;
-    #state = null;
+    // #scope = null;
+    // #state = null;
     #eventAttributes = []
     #modifierAttributes = []
     #otherAttributes = []
 
-    getState(element){
-        return this.#state || getComponentState(element) || null;
-    }
+    // getState(element){
+    //     return this.#state || getComponentState(element) || null;
+    // }
 
-    setState(state){
-        this.#state = state;
-    }
+    // setState(state){
+    //     this.#state = state;
+    // }
 
-    getScope(element){
-        return this.#scope || getComponentScope(element) || null;
-    }
-    setScope(value){
-        this.#scope = value;
-    }
+    // getScope(element){
+    //     return this.#scope || getComponentScope(element) || null;
+    // }
+    // setScope(value){
+    //     this.#scope = value;
+    // }
 
     disconnectedCallback(element) {
         this.#modifierAttributes.forEach(x => x.disconnectedCallback());
@@ -58,7 +58,7 @@ class elementAttributeManager{
                 this.#eventAttributes.push(attributeInstance) :
                 this.#otherAttributes.push(attributeInstance);
 
-            await attributeInstance.connectedCallback(element.state);
+            await attributeInstance.connectedCallback(element.context);
         }
     }
 }
