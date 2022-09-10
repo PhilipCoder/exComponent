@@ -4,43 +4,50 @@ import { arrayToObject } from "../helpers/object.js"
  * The context class is the class  that should contain
  */
 class context {
-    scopedVariables = [];
-    constructor(scopedVariables = []) {
+    scopedVariables = {};
+    constructor(scopedVariables = {}) {
         this.scopedVariables = scopedVariables;
     }
     addVariable(name, value) {
         if (typeof value === "string" || typeof value === "number" || typeof value === "undefined") {
             throw "Invalid context type applied";
         }
-        this.scopedVariables.push({ name, value });
+        this.scopedVariables[name] = value;
     }
 
     getVariable(name) {
-        return this.scopedVariables.filter(x => x.name == name)[0]?.value;
+        return this.scopedVariables[name]
     }
 
     getScopedVariablesObj() {
-        return arrayToObject(this.scopedVariables, (x) => x.name, (x) => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
+        let result = Object.assign({},this.scopedVariables);
+        Object.keys(result).forEach(x => result[x]= result[x].boundProp ? result[x][result[x].boundProp] : result[x]);
+        return result;
+    }
+
+    #getScopedVariables(){
+        let scopeNames = Object.keys(this.scopedVariables);
+        let scopeValues = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x].boundProp ? this.scopedVariables[x][this.scopedVariables[x].boundProp] : this.scopedVariables[x]);
+        return {scopeNames, scopeValues};
     }
 
     executeScopedExpression(expression) {
-        let scopeNames = this.scopedVariables.map(x => x.name);
-        let scopeValues = this.scopedVariables.map(x => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
-        return Function(...scopeNames, `return ${expression}`)(...scopeValues);
+        let scopeVars = this.#getScopedVariables();
+        return Function(...scopeVars.scopeNames, `return ${expression}`)(...scopeVars.scopeValues);
     }
 
     executeScopedStatement(expression) {
-        let scopeNames = this.scopedVariables.map(x => x.name);
-        let scopeValues = this.scopedVariables.map(x => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
-        return Function(...scopeNames, `${expression}`)(...scopeValues);
+        let scopeVars = this.#getScopedVariables();
+        return Function(...scopeVars.scopeNames, `${expression}`)(...scopeVars.scopeValues);
     }
 
     getOfType(type) {
-        return this.scopedVariables.filter(x => x.value instanceof type).map(x => x.value);
+        let scopeVars =   Object.keys(this.scopedVariables).map(x =>  this.scopedVariables[x]);
+        return scopeVars.filter(x => x instanceof type);
     }
 
     getScopedVariables() {
-        return this.scopedVariables;
+        return Object.assign({},this.scopedVariables);
     }
 }
 

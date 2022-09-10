@@ -17,6 +17,24 @@
         <div is="ex-div" ex-bind="state.person.peronalDetails.name" >
         </div>
         <button is="ex-button" ex-on-click="scope.alertMe()">Append surname</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Job Title</th>
+                    <th>Email</th>
+                    <th>Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr is="ex-tr" ex-repeat="{'person':state.allPeople}">
+                    <td is="ex-td" ex-bind="person.ID"></td>
+                    <td is="ex-td" ex-bind="person.JobTitle"></td>
+                    <td is="ex-td" ex-bind="person.EmailAddress"></td>
+                    <td is="ex-td" ex-bind="person.FirstNameLastName"></td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </body>
 

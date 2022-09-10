@@ -981,23 +981,24 @@ class stateManager {
 
 class exAttribute {
     boundPaths = {}
+    /**@type{HTMLElement} */
     element = null
     static Priority = 0;
-    
+
     constructor(element, binding) {
         this.element = element;
         this.binding = binding;
     }
 
-    get context(){
+    get context() {
         return this.element.context;
     }
 
-    connectedCallback(){
+    connectedCallback() {
 
     }
 
-    disconnectedCallback(){
+    disconnectedCallback() {
 
     }
 }
@@ -1145,6 +1146,123 @@ class onClick extends exEventAttribute{
     }
 }
 
+/**
+ * The context class is the class  that should contain
+ */
+class context {
+    scopedVariables = {};
+    constructor(scopedVariables = {}) {
+        this.scopedVariables = scopedVariables;
+    }
+    addVariable(name, value) {
+        if (typeof value === "string" || typeof value === "number" || typeof value === "undefined") {
+            throw "Invalid context type applied";
+        }
+        this.scopedVariables[name] = value;
+    }
+
+    getVariable(name) {
+        return this.scopedVariables[name]
+    }
+
+    getScopedVariablesObj() {
+        let result = Object.assign({},this.scopedVariables);
+        Object.keys(result).forEach(x => result[x]= result[x].boundProp ? result[x][result[x].boundProp] : result[x]);
+        return result;
+    }
+
+    #getScopedVariables(){
+        let scopeNames = Object.keys(this.scopedVariables);
+        let scopeValues = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x].boundProp ? this.scopedVariables[x][this.scopedVariables[x].boundProp] : this.scopedVariables[x]);
+        return {scopeNames, scopeValues};
+    }
+
+    executeScopedExpression(expression) {
+        let scopeVars = this.#getScopedVariables();
+        return Function(...scopeVars.scopeNames, `return ${expression}`)(...scopeVars.scopeValues);
+    }
+
+    executeScopedStatement(expression) {
+        let scopeVars = this.#getScopedVariables();
+        return Function(...scopeVars.scopeNames, `${expression}`)(...scopeVars.scopeValues);
+    }
+
+    getOfType(type) {
+        let scopeVars =   Object.keys(this.scopedVariables).map(x =>  this.scopedVariables[x]);
+        return scopeVars.filter(x => x instanceof type);
+    }
+
+    getScopedVariables() {
+        return Object.assign({},this.scopedVariables);
+    }
+}
+
+class _detachedElementContainer {
+    detachedElements = new Map();
+
+    addElement(parentElement, element) {
+        let elements = [...(this.detachedElements.get(parentElement)) || [], element];
+        this.detachedElements.set(parentElement, elements);
+    }
+
+    parentDisconnected(element){
+        this.detachedElements.get(element)?.forEach(element => {
+            element?.disconnectedCallback();
+        });
+    }
+}
+
+const detachedElementContainer = new _detachedElementContainer();
+
+class exLoop extends exModifierAttribute {
+    #duplicatedItems = [];
+    #originalElement = null;
+    #toDuplicate = null;
+    #documentElement = null
+    dataCallback(data) {
+        if (typeof data !== "object") {
+            throw `Loop attribute should have object value;`;
+        }
+        if (Object.keys(data).length != 1) {
+            throw `Loop object should have one property`;
+        }
+        let variableName = Object.keys(data)[0];
+        let loopArray = data[variableName];
+        if (!this.#originalElement) {
+            let childContext = this.element.context?.getScopedVariables() || {};
+            childContext[variableName] = {};
+            this.element.context = new context(childContext);
+            
+            this.#originalElement = this.element;
+            this.#toDuplicate = this.element.cloneNode(true);
+            this.#toDuplicate.removeAttribute("ex-repeat");
+            detachedElementContainer.addElement(this.element.parentElement, this);
+            this.#documentElement = this.element.parentElement;
+            this.element.parentElement.removeChild(this.element);
+            this.element.style.display = "none";
+        }
+        for (let toRemove of this.#duplicatedItems) {
+            this.element.parentElement.removeChild(toRemove);
+        }
+        this.#duplicatedItems = [];
+       
+        if (!Array.isArray(loopArray)) {
+            console.log("Loop value is not an array.");
+            return;
+        }
+
+        for (let index = 0; index < loopArray.length; index++) {
+            let loopItem = loopArray[index];
+            let toAdd = this.#toDuplicate.cloneNode(true);
+            let childContext = this.element.context?.getScopedVariables() || {};
+            childContext[variableName] = loopItem;
+            toAdd.context = new context(childContext);
+            this.#documentElement.appendChild(toAdd);
+            this.#duplicatedItems.push(toAdd);
+        }
+    }
+}
+
 class _attributeContainer {
     #registeredAttributes = new Map();
     /**
@@ -1173,31 +1291,15 @@ attributeContainer.registerAttribute("ex-scope", exScope);
 attributeContainer.registerAttribute("ex-state", exState);
 attributeContainer.registerAttribute("ex-bind", exBind);
 attributeContainer.registerAttribute("ex-on-click", onClick);
+attributeContainer.registerAttribute("ex-repeat", exLoop);
 
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 
 class elementAttributeManager{
 
-    // #scope = null;
-    // #state = null;
     #eventAttributes = []
     #modifierAttributes = []
     #otherAttributes = []
-
-    // getState(element){
-    //     return this.#state || getComponentState(element) || null;
-    // }
-
-    // setState(state){
-    //     this.#state = state;
-    // }
-
-    // getScope(element){
-    //     return this.#scope || getComponentScope(element) || null;
-    // }
-    // setScope(value){
-    //     this.#scope = value;
-    // }
 
     disconnectedCallback(element) {
         this.#modifierAttributes.forEach(x => x.disconnectedCallback());
@@ -1265,71 +1367,14 @@ const getComponentContext = (element) => {
     return null;
 };
 
-/**
- * @param {Array} array 
- * @param (Function)} keyFunction 
- * @param {Function} valueFunction 
- */
-const arrayToObject = (array, keyFunction, valueFunction)=>{
-    let result = {};
-    array.forEach(x=>{
-        result[keyFunction(x)] = valueFunction(x);
-    });
-    return result;
-};
-
-/**
- * The context class is the class  that should contain
- */
-class context {
-    scopedVariables = [];
-    constructor(scopedVariables = []) {
-        this.scopedVariables = scopedVariables;
-    }
-    addVariable(name, value) {
-        if (typeof value === "string" || typeof value === "number" || typeof value === "undefined") {
-            throw "Invalid context type applied";
-        }
-        this.scopedVariables.push({ name, value });
-    }
-
-    getVariable(name) {
-        return this.scopedVariables.filter(x => x.name == name)[0]?.value;
-    }
-
-    getScopedVariablesObj() {
-        return arrayToObject(this.scopedVariables, (x) => x.name, (x) => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
-    }
-
-    executeScopedExpression(expression) {
-        let scopeNames = this.scopedVariables.map(x => x.name);
-        let scopeValues = this.scopedVariables.map(x => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
-        return Function(...scopeNames, `return ${expression}`)(...scopeValues);
-    }
-
-    executeScopedStatement(expression) {
-        let scopeNames = this.scopedVariables.map(x => x.name);
-        let scopeValues = this.scopedVariables.map(x => x.value.boundProp ? x.value[x.value.boundProp] : x.value);
-        return Function(...scopeNames, `${expression}`)(...scopeValues);
-    }
-
-    getOfType(type) {
-        return this.scopedVariables.filter(x => x.value instanceof type).map(x => x.value);
-    }
-
-    getScopedVariables() {
-        return this.scopedVariables;
-    }
-}
-
-class exComponent //extends HTMLElement 
+class exComponent  
 {
 
     get context() {
         return this._context || getComponentContext(this) || null;
     }
     set context(value) {
-        this._context = this._context || value;
+        this._context =  value;
     }
 
     get attributeManager() {
@@ -1352,26 +1397,13 @@ class exComponent //extends HTMLElement
         }
     }
 
-    // get scope() {
-    //     return this.attributeManager.getScope(this);
-    // }
-    // set scope(value) {
-    //     this.attributeManager.setScope(value);
-    // }
-
-    // get state() {
-    //     return this.attributeManager.getState(this);
-    // }
-    // set state(value) {
-    //     this.attributeManager.setState(value);
-    // }
-
     async connectedCallback() {
         await this.attributeManager.connectedCallback(this);
     }
 
     disconnectedCallback() {
         this.attributeManager.disconnectedCallback(this);
+        detachedElementContainer.parentDisconnected(this);
     }
 
     static InheritFrom(classDef) {

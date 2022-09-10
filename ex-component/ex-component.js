@@ -1,14 +1,15 @@
 import elementAttributeManager from "./helpers/attributeActivator.js"
 import { getComponentContext } from "./helpers/state-helpers.js";
 import { context } from "./state/context.js";
-class exComponent //extends HTMLElement 
+import detachedElementContainer from "./state/detached-element-container.js";
+class exComponent  
 {
 
     get context() {
         return this._context || getComponentContext(this) || null;
     }
     set context(value) {
-        this._context = this._context || value;
+        this._context =  value;
     }
 
     get attributeManager() {
@@ -31,26 +32,13 @@ class exComponent //extends HTMLElement
         }
     }
 
-    // get scope() {
-    //     return this.attributeManager.getScope(this);
-    // }
-    // set scope(value) {
-    //     this.attributeManager.setScope(value);
-    // }
-
-    // get state() {
-    //     return this.attributeManager.getState(this);
-    // }
-    // set state(value) {
-    //     this.attributeManager.setState(value);
-    // }
-
     async connectedCallback() {
         await this.attributeManager.connectedCallback(this);
     }
 
     disconnectedCallback() {
         this.attributeManager.disconnectedCallback(this);
+        detachedElementContainer.parentDisconnected(this);
     }
 
     static InheritFrom(classDef) {

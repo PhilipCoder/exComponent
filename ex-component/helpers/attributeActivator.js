@@ -6,26 +6,9 @@ import attributeContainer from "../state/attribute-container.js";
 
 class elementAttributeManager{
 
-    // #scope = null;
-    // #state = null;
     #eventAttributes = []
     #modifierAttributes = []
     #otherAttributes = []
-
-    // getState(element){
-    //     return this.#state || getComponentState(element) || null;
-    // }
-
-    // setState(state){
-    //     this.#state = state;
-    // }
-
-    // getScope(element){
-    //     return this.#scope || getComponentScope(element) || null;
-    // }
-    // setScope(value){
-    //     this.#scope = value;
-    // }
 
     disconnectedCallback(element) {
         this.#modifierAttributes.forEach(x => x.disconnectedCallback());
