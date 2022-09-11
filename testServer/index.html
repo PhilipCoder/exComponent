@@ -11,13 +11,18 @@
     </script>
 </head>
 
-<body is="ex-body"  ex-state="{state:'./state.js'}" ex-scope="{scope:'./scope.js'}">
+<body is="ex-body" ex-state="{state:'./state.js'}" ex-scope="{scope:'./scope.js'}">
     <div is="ex-div" ex-route>
         <h1>Hello World</h1>
+        
         <div is="ex-div" ex-if="route.path === '/'">
-            <div is="ex-div" ex-bind="state.person.peronalDetails.name">
-            </div>
-            <button is="ex-button" ex-on-click="scope.alertMe()">Append surname</button>
+            <ol>
+                <li><a href="#/repeat">Repeat</a></li>
+                <li><a href="#/model">Model</a></li>
+    
+            </ol>
+        </div>
+        <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html">
         </div>
         <div is="ex-div" ex-if="route.path === '/repeat'">
             <table>

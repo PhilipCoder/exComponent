@@ -1,6 +1,6 @@
 1) ex-if
 2) ex-bind-html (sanitized html, one directional binding)
-3) ex-bind-value
+3) ex-value
 4) ex-bind-disabled
 5) ex-bind-class
 7) ex-on-blur

@@ -1244,9 +1244,7 @@ class exIf extends exModifierAttribute {
     #parentNode = null
     #isAttached = true;
     static Priority = 2;
-    #outerHTML = "";
     #elementId = uuidv4();
-    #document = this.element.ownerDocument;
     #comment = null;
     #toInsert = null;
     #element = null;
@@ -1259,12 +1257,10 @@ class exIf extends exModifierAttribute {
         if (!this.#parentNode) {
             this.#parentNode = this.element.parentElement;
             this.element.removeAttribute("ex-if");
-           // this.#outerHTML = this.element.outerHTML;
             this.#toInsert = this.element.cloneNode(true);
             this.#element = this.element;
             this.#originalElement =  this.element.cloneNode(true);
             detachedElementContainer.addElement(this.element.parentElement, this);
-          //  console.log(this.#outerHTML+"")
         }
         let shouldAttach = !!data;
         if (this.#isAttached && !shouldAttach) {
@@ -1336,6 +1332,18 @@ class exRoute extends exAttribute {
     }
 }
 
+class exInclude extends exAttribute {
+    async connectedCallback() {
+        const htmlRequest = new Request(this.binding); 
+        const response = await fetch(htmlRequest);
+        if (response.ok){
+            let html = await response.text();
+            this.element.innerHTML = html;
+        }
+
+    }
+}
+
 class _attributeContainer {
     #registeredAttributes = new Map();
     /**
@@ -1367,6 +1375,7 @@ attributeContainer.registerAttribute("ex-on-click", onClick);
 attributeContainer.registerAttribute("ex-repeat", exLoop);
 attributeContainer.registerAttribute("ex-if", exIf);
 attributeContainer.registerAttribute("ex-route", exRoute);
+attributeContainer.registerAttribute("ex-include", exInclude);
 
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 
@@ -1380,7 +1389,6 @@ class elementAttributeManager{
         this.#modifierAttributes.forEach(x => x.disconnectedCallback());
         this.#eventAttributes.forEach(x => x.disconnectedCallback());
         this.#otherAttributes.forEach(x => x.disconnectedCallback());
-      //  this.#modifierAttributes.forEach(x => x.unsubscribe && x.unsubscribe());
     }
 
     async connectedCallback(element) {
