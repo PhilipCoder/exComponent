@@ -815,102 +815,52 @@ function filter(predicate, thisArg) {
     });
 }
 
-function parsePath(text) {
-  return text.split('.')
-}
+const observableProxy = (name, object, setCallback) => {
+    if (typeof object !== "object") throw "Proxy object should be an object";
+    let lastPathAccessed = [];
 
-function push(arr, el) {
-  const newArr = arr.slice();
-  newArr.push(el);
-  return newArr;
-}
-
-const trapNames = [
-  'apply',
-  'construct',
-  'defineProperty',
-  'deleteProperty',
-  'enumerate',
-  'get',
-  'getOwnPropertyDescriptor',
-  'getPrototypeOf',
-  'has',
-  'isExtensible',
-  'ownKeys',
-  'preventExtensions',
-  'set',
-  'setPrototypeOf',
-];
-const keys = {
-  get: 1,
-  set: 1,
-  deleteProperty: 1,
-  has: 1,
-  defineProperty: 1,
-  getOwnPropertyDescriptor: 1,
+    const getHandler = (path) => {
+        let proxyHandler = {
+            get(target, key, receiver) {
+                let result = target[key];
+                lastPathAccessed.push(`${path}.${key}`);
+                if (typeof result === "object" && result.__objectPath === undefined) {
+                    result = new Proxy(result, getHandler(`${path}.${key}`));
+                    target[key] = result;
+                    return result;
+                }
+                if (key === "__objectPath") {
+                    return path;
+                }
+                if (key === "__originalObject") {
+                    return target;
+                }
+                return result;
+            },
+            set(target, prop, value) {
+                if (typeof value === "object") {
+                    if (value.__originalObject) {
+                        throw `State proxy can't be reassigned.`;
+                    }
+                    value = new Proxy(result, getHandler(`${path}.${prop}`));
+                }
+                target[prop] = value;
+                setCallback(`${path}.${prop}`);
+                return true;
+            }
+        };
+        return proxyHandler;
+    };
+    const resetPaths = () => {
+        lastPathAccessed = [];
+    };
+    const getLastPathAccessed = () => {
+        let result = [...lastPathAccessed];
+        lastPathAccessed = [];
+        return result;
+    };
+    return { proxy: new Proxy(object, getHandler(name)), getLastPathAccessed, resetPaths }
 };
-
-function DeepProxy(rootTarget, traps, options) {
-
-  let path = [];
-  let userData = {};
-
-  if (options !== undefined && typeof options.path !== 'undefined') {
-    path = parsePath(options.path);
-  }
-  if (options !== undefined && typeof options.userData !== 'undefined') {
-    userData = options.userData;
-  }
-
-  function createProxy(target, path) {
-
-    // avoid creating a new object between two traps
-    const context = { rootTarget, path };
-    Object.assign(context, userData);
-
-    const realTraps = {};
-
-    for (const trapName of trapNames) {
-      const keyParamIdx = keys[trapName]
-          , trap = traps[trapName];
-
-      if (typeof trap !== 'undefined') {
-
-        if (typeof keyParamIdx !== 'undefined') {
-
-          realTraps[trapName] = function () {
-
-            const key = arguments[keyParamIdx];
-
-            // update context for this trap
-            context.nest = function (nestedTarget) {
-              if (nestedTarget === undefined)
-                nestedTarget = rootTarget;
-              return createProxy(nestedTarget, push(path, key)); 
-            };
-
-            return trap.apply(context, arguments);
-          };
-        } else {
-          realTraps[trapName] = function () {
-            context.nest = function (nestedTarget) {
-              if (nestedTarget === undefined)
-                nestedTarget = {};
-              return createProxy(nestedTarget, path);
-            };
-
-            return trap.apply(context, arguments);
-          };
-        }
-      }
-    }
-
-    return new Proxy(target, realTraps);
-  }
-
-  return createProxy(rootTarget, path);
-
-}
 
 class stateManager {
     name = ""
@@ -920,6 +870,8 @@ class stateManager {
     //Fields
     boundProp = "state"
     #state = null;
+    #getAccessedPaths = null;
+    #resetPaths = null;
 
     accessedPaths = null
     accessedObservable = new Subject()
@@ -942,38 +894,42 @@ class stateManager {
         if (this.#state) {
             Object.keys(this.#state).forEach(x => that.changedObservable.next(x));
         }
-        const proxyManager = {
-            get(target, key, receiver) {
-                const val = Reflect.get(target, key, receiver);
-                let path = [...this.path, key];
-                that.accessedObservable.next(path);
-                if (typeof val === 'object' && val !== null) {
-                    //that.accessedPaths && that.accessedPaths.push([...this.path, key].join('.'));
-                    return this.nest(val)
-                } else {
-                    that.accessedPaths && that.accessedPaths.push(path.join('.'));
-                    return val
-                }
-            },
-            set(obj, prop, val) {
-                if (typeof val === 'object' && val !== null) {
-                    value = this.nest(val);
-                }
-                obj[prop] = val;
-                that.changedObservable.next(this.path.join('.'));
-                return true;
-            }
+        const valueSet = (path)=>{
+            that.changedObservable.next(path);
         };
-        return DeepProxy(stateObj, proxyManager);//, { path: "state" }
+        let proxyResult = observableProxy(this.name, stateObj, valueSet);
+        this.#getAccessedPaths = proxyResult.getLastPathAccessed;
+        this.#resetPaths = proxyResult.resetPaths;
+        // const proxyManager = {
+        //     get(target, key, receiver) {
+        //         const val = Reflect.get(target, key, receiver);
+        //         let path = [...this.path, key];
+        //         that.accessedObservable.next(path);
+        //         if (typeof val === 'object' && val !== null) {
+        //             //that.accessedPaths && that.accessedPaths.push([...this.path, key].join('.'));
+        //             return this.nest(val)
+        //         } else {
+        //             that.accessedPaths && that.accessedPaths.push(path.join('.'));
+        //             return val
+        //         }
+        //     },
+        //     set(obj, prop, val) {
+        //         if (typeof val === 'object' && val !== null) {
+        //             value = this.nest(val)
+        //         }
+        //         obj[prop] = val;
+        //         that.changedObservable.next(this.path.join('.'));
+        //         return true;
+        //     }
+        // }
+        // return deepProxy(stateObj, proxyManager);//, { path: "state" }
+        return proxyResult.proxy;
     }
 
     GetAccessedPaths() {
-        let accessedPathsResult = [];
-        this.accessedPaths = [];
+        this.#resetPaths();
         return () => {
-            accessedPathsResult = this.accessedPaths;
-            this.accessedPaths = null;
-            return accessedPathsResult;
+            return this.#getAccessedPaths();
         };
     }
 
@@ -1025,6 +981,10 @@ class exModifierAttribute extends exAttribute {
         this.dataCallback(this.getData());
     }
 
+    unsubscribe(){
+        this.#boundPathSubscriptions.forEach(x=>x.unsubscribe());
+    }
+
     connectedCallback() {
         let stateManagers = this.context.getOfType(stateManager);
         let pathFuncs = stateManagers.map(x => ({ stateManager: x, paths: x.GetAccessedPaths() }));
@@ -1058,7 +1018,7 @@ class exEventAttribute extends exAttribute {
 }
 
 class exScope extends exAttribute {
-    static Priority = 1;
+    static Priority = 4;
     async connectedCallback() {
         let scopeObj = await Function(`return ${this.binding}`)();
         for (let scopeVarName in scopeObj) {
@@ -1093,7 +1053,7 @@ class exScope extends exAttribute {
 }
 
 class exState extends exAttribute {
-    static Priority = 3;
+    static Priority = 5;
     async connectedCallback() {
         let innerHTML = this.element.innerHTML;
         this.element.innerHTML = "";
@@ -1166,34 +1126,42 @@ class context {
     }
 
     getScopedVariablesObj() {
-        let result = Object.assign({},this.scopedVariables);
-        Object.keys(result).forEach(x => result[x]= result[x].boundProp ? result[x][result[x].boundProp] : result[x]);
+        let result = Object.assign({}, this.scopedVariables);
+        Object.keys(result).forEach(x => result[x] = result[x].boundProp ? result[x][result[x].boundProp] : result[x]);
         return result;
     }
 
-    #getScopedVariables(){
+    #getScopedVariables() {
         let scopeNames = Object.keys(this.scopedVariables);
         let scopeValues = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x].boundProp ? this.scopedVariables[x][this.scopedVariables[x].boundProp] : this.scopedVariables[x]);
-        return {scopeNames, scopeValues};
+        return { scopeNames, scopeValues };
     }
 
-    executeScopedExpression(expression) {
+    executeScopedExpression(expression, parameters = {}) {
         let scopeVars = this.#getScopedVariables();
+        Object.keys(parameters).forEach(x => { 
+            scopeVars.scopeNames.push(x);
+            scopeVars.scopeValues.push(parameters[x]);
+         });
         return Function(...scopeVars.scopeNames, `return ${expression}`)(...scopeVars.scopeValues);
     }
 
-    executeScopedStatement(expression) {
+    executeScopedStatement(expression, parameters = {}) {
         let scopeVars = this.#getScopedVariables();
+        Object.keys(parameters).forEach(x => { 
+            scopeVars.scopeNames.push(x);
+            scopeVars.scopeValues.push(parameters[x]);
+         });
         return Function(...scopeVars.scopeNames, `${expression}`)(...scopeVars.scopeValues);
     }
 
     getOfType(type) {
-        let scopeVars =   Object.keys(this.scopedVariables).map(x =>  this.scopedVariables[x]);
+        let scopeVars = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x]);
         return scopeVars.filter(x => x instanceof type);
     }
 
     getScopedVariables() {
-        return Object.assign({},this.scopedVariables);
+        return Object.assign({}, this.scopedVariables);
     }
 }
 
@@ -1208,6 +1176,7 @@ class _detachedElementContainer {
     parentDisconnected(element){
         this.detachedElements.get(element)?.forEach(element => {
             element?.disconnectedCallback();
+            element.unsubscribe && element.unsubscribe();
         });
     }
 }
@@ -1219,6 +1188,8 @@ class exLoop extends exModifierAttribute {
     #originalElement = null;
     #toDuplicate = null;
     #documentElement = null
+ 
+
     dataCallback(data) {
         if (typeof data !== "object") {
             throw `Loop attribute should have object value;`;
@@ -1239,7 +1210,6 @@ class exLoop extends exModifierAttribute {
             detachedElementContainer.addElement(this.element.parentElement, this);
             this.#documentElement = this.element.parentElement;
             this.element.parentElement.removeChild(this.element);
-            this.element.style.display = "none";
         }
         for (let toRemove of this.#duplicatedItems) {
             this.element.parentElement.removeChild(toRemove);
@@ -1260,6 +1230,109 @@ class exLoop extends exModifierAttribute {
             this.#documentElement.appendChild(toAdd);
             this.#duplicatedItems.push(toAdd);
         }
+    }
+}
+
+function uuidv4() {
+    return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+      (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+    );
+  }
+
+class exIf extends exModifierAttribute {
+    /**@type {HTMLElement} */
+    #parentNode = null
+    #isAttached = true;
+    static Priority = 2;
+    #outerHTML = "";
+    #elementId = uuidv4();
+    #document = this.element.ownerDocument;
+    #comment = null;
+    #toInsert = null;
+    #element = null;
+    #originalElement = null;
+    disconnectedCallback() {
+    }
+
+
+    dataCallback(data) {
+        if (!this.#parentNode) {
+            this.#parentNode = this.element.parentElement;
+            this.element.removeAttribute("ex-if");
+           // this.#outerHTML = this.element.outerHTML;
+            this.#toInsert = this.element.cloneNode(true);
+            this.#element = this.element;
+            this.#originalElement =  this.element.cloneNode(true);
+            detachedElementContainer.addElement(this.element.parentElement, this);
+          //  console.log(this.#outerHTML+"")
+        }
+        let shouldAttach = !!data;
+        if (this.#isAttached && !shouldAttach) {
+         
+            this.#comment = document.createComment(this.#elementId);
+            this.#parentNode.insertBefore(this.#comment,this.#element);
+            this.#parentNode.removeChild(this.#element);
+            this.#isAttached = false;
+        } else if (!this.#isAttached && shouldAttach) {
+            this.#toInsert = this.#originalElement.cloneNode(true);
+            this.#parentNode.insertBefore(this.#toInsert,this.#comment);
+            this.#parentNode.removeChild(this.#comment);
+            this.#element = this.#toInsert;
+            this.#isAttached = true;
+        }
+
+    }
+}
+
+const getHashValues = () => {
+    let hash = decodeURI(window.location.hash);
+    hash = hash.substring(1);
+    let hashParameters = hash.includes("?");
+    let path = hashParameters ? hash.substring(0, hash.lastIndexOf("?")) : hash;
+    let parameters = {};
+    if (hashParameters) {
+        let parameters = hash.substring(hash.lastIndexOf("?") + 1);
+        parameters = parameters.split("&").reduce((obj, item) => {
+            let parts = item.split("=");
+            if (parts.length == 2) {
+                throw "Invalid parameters";
+            }
+            return { ...obj, [parts[0]]: parts[1], };
+        }, parameters);
+    }
+    path = path || "/";
+    return { path, parameters }
+};
+
+class exRoute extends exAttribute {
+    static Priority = 3;
+    #urlChangedEvent = null;
+    urlChanged(event) {
+        console.log(event.state);
+    }
+
+    connectedCallback() {
+        let routeValues = getHashValues();
+        let stateManagerInstance = new stateManager("route");
+        stateManagerInstance.state = { path: routeValues.path };
+   //     this.element.createContext();
+        this.element.context.addVariable("route", stateManagerInstance);
+        let attributeInstance = this;
+        window.onpopstate = (event) => {
+            let routeValues = getHashValues();
+            attributeInstance.context.scopedVariables["route"].state.path = routeValues.path;
+        //    attributeInstance.context.executeScopedStatement("route.path = hashPath", { hashPath: routeValues.path })
+        };
+        // window.addEventListener('locationchange', function () {
+        //     console.log('onlocationchange event occurred!');
+        // })
+        // window.addEventListener('hashchange', function () {
+        //     console.log('onhashchange event occurred!');
+        // })
+    }
+
+    disconnectedCallback() {
+
     }
 }
 
@@ -1292,6 +1365,8 @@ attributeContainer.registerAttribute("ex-state", exState);
 attributeContainer.registerAttribute("ex-bind", exBind);
 attributeContainer.registerAttribute("ex-on-click", onClick);
 attributeContainer.registerAttribute("ex-repeat", exLoop);
+attributeContainer.registerAttribute("ex-if", exIf);
+attributeContainer.registerAttribute("ex-route", exRoute);
 
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 
@@ -1305,6 +1380,7 @@ class elementAttributeManager{
         this.#modifierAttributes.forEach(x => x.disconnectedCallback());
         this.#eventAttributes.forEach(x => x.disconnectedCallback());
         this.#otherAttributes.forEach(x => x.disconnectedCallback());
+      //  this.#modifierAttributes.forEach(x => x.unsubscribe && x.unsubscribe());
     }
 
     async connectedCallback(element) {
@@ -1371,7 +1447,8 @@ class exComponent
 {
 
     get context() {
-        return this._context || getComponentContext(this) || null;
+        this._context = this._context || getComponentContext(this);
+        return this._context
     }
     set context(value) {
         this._context =  value;

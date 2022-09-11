@@ -7,6 +7,8 @@ class exLoop extends exModifierAttribute {
     #originalElement = null;
     #toDuplicate = null;
     #documentElement = null
+ 
+
     dataCallback(data) {
         if (typeof data !== "object") {
             throw `Loop attribute should have object value;`;

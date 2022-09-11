@@ -2,9 +2,12 @@
   "dependencies": {
     "connect": "^3.7.0",
     "jasmine": "^4.3.0",
+    "js-guid": "^1.0.0",
+    "mime-types": "^2.1.35",
     "mocha": "^10.0.0",
     "rxjs": "^7.5.6",
-    "serve-static": "^1.15.0"
+    "serve-static": "^1.15.0",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "rollup-plugin-node-resolve": "^5.2.0"

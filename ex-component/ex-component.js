@@ -6,7 +6,8 @@ class exComponent
 {
 
     get context() {
-        return this._context || getComponentContext(this) || null;
+        this._context = this._context || getComponentContext(this);
+        return this._context
     }
     set context(value) {
         this._context =  value;

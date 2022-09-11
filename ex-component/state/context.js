@@ -20,34 +20,42 @@ class context {
     }
 
     getScopedVariablesObj() {
-        let result = Object.assign({},this.scopedVariables);
-        Object.keys(result).forEach(x => result[x]= result[x].boundProp ? result[x][result[x].boundProp] : result[x]);
+        let result = Object.assign({}, this.scopedVariables);
+        Object.keys(result).forEach(x => result[x] = result[x].boundProp ? result[x][result[x].boundProp] : result[x]);
         return result;
     }
 
-    #getScopedVariables(){
+    #getScopedVariables() {
         let scopeNames = Object.keys(this.scopedVariables);
         let scopeValues = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x].boundProp ? this.scopedVariables[x][this.scopedVariables[x].boundProp] : this.scopedVariables[x]);
-        return {scopeNames, scopeValues};
+        return { scopeNames, scopeValues };
     }
 
-    executeScopedExpression(expression) {
+    executeScopedExpression(expression, parameters = {}) {
         let scopeVars = this.#getScopedVariables();
+        Object.keys(parameters).forEach(x => { 
+            scopeVars.scopeNames.push(x);
+            scopeVars.scopeValues.push(parameters[x]);
+         })
         return Function(...scopeVars.scopeNames, `return ${expression}`)(...scopeVars.scopeValues);
     }
 
-    executeScopedStatement(expression) {
+    executeScopedStatement(expression, parameters = {}) {
         let scopeVars = this.#getScopedVariables();
+        Object.keys(parameters).forEach(x => { 
+            scopeVars.scopeNames.push(x);
+            scopeVars.scopeValues.push(parameters[x]);
+         })
         return Function(...scopeVars.scopeNames, `${expression}`)(...scopeVars.scopeValues);
     }
 
     getOfType(type) {
-        let scopeVars =   Object.keys(this.scopedVariables).map(x =>  this.scopedVariables[x]);
+        let scopeVars = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x]);
         return scopeVars.filter(x => x instanceof type);
     }
 
     getScopedVariables() {
-        return Object.assign({},this.scopedVariables);
+        return Object.assign({}, this.scopedVariables);
     }
 }
 

@@ -8,7 +8,7 @@ export default [
       format: 'es'
     },
     plugins: [
-      resolve()
+      resolve({})
     ]
   }, {
     input: '..\\container.js',

@@ -17,6 +17,10 @@ class exModifierAttribute extends exAttribute {
         this.dataCallback(this.getData());
     }
 
+    unsubscribe(){
+        this.#boundPathSubscriptions.forEach(x=>x.unsubscribe());
+    }
+
     connectedCallback() {
         let stateManagers = this.context.getOfType(stateManager);
         let pathFuncs = stateManagers.map(x => ({ stateManager: x, paths: x.GetAccessedPaths() }));

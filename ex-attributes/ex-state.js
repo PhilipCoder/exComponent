@@ -2,7 +2,7 @@ import exAttribute from "../ex-component/ex-attribute.js";
 import stateManager from "../ex-component/state/state-manager.js";
 
 class exState extends exAttribute {
-    static Priority = 3;
+    static Priority = 5;
     async connectedCallback() {
         let innerHTML = this.element.innerHTML;
         this.element.innerHTML = "";

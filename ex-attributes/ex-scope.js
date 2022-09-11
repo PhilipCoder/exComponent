@@ -1,7 +1,7 @@
 import exAttribute from "../ex-component/ex-attribute.js";
 
 class exScope extends exAttribute {
-    static Priority = 1;
+    static Priority = 4;
     async connectedCallback() {
         let scopeObj = await Function(`return ${this.binding}`)();
         for (let scopeVarName in scopeObj) {

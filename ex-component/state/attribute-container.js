@@ -4,6 +4,9 @@ import exState from "../../ex-attributes/ex-state.js";
 import exBind from "../../ex-attributes/ex-bind.js";
 import exOnClick from "../../ex-attributes/ex-on-click";
 import exLoop from "../../ex-attributes/ex-loop.js";
+import exIf from "../../ex-attributes/ex-if.js";
+import exRoute from "../../ex-attributes/ex-route.js";
+
 
 class _attributeContainer {
     #registeredAttributes = new Map();
@@ -34,5 +37,7 @@ attributeContainer.registerAttribute("ex-state", exState);
 attributeContainer.registerAttribute("ex-bind", exBind);
 attributeContainer.registerAttribute("ex-on-click", exOnClick);
 attributeContainer.registerAttribute("ex-repeat", exLoop);
+attributeContainer.registerAttribute("ex-if", exIf);
+attributeContainer.registerAttribute("ex-route", exRoute);
 
 export default attributeContainer;
