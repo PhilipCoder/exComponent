@@ -824,6 +824,7 @@ const observableProxy = (name, object, setCallback) => {
             get(target, key, receiver) {
                 let result = target[key];
                 lastPathAccessed.push(`${path}.${key}`);
+                result = result === undefined ? {} : result;
                 if (typeof result === "object" && result.__objectPath === undefined) {
                     result = new Proxy(result, getHandler(`${path}.${key}`));
                     target[key] = result;
@@ -900,29 +901,6 @@ class stateManager {
         let proxyResult = observableProxy(this.name, stateObj, valueSet);
         this.#getAccessedPaths = proxyResult.getLastPathAccessed;
         this.#resetPaths = proxyResult.resetPaths;
-        // const proxyManager = {
-        //     get(target, key, receiver) {
-        //         const val = Reflect.get(target, key, receiver);
-        //         let path = [...this.path, key];
-        //         that.accessedObservable.next(path);
-        //         if (typeof val === 'object' && val !== null) {
-        //             //that.accessedPaths && that.accessedPaths.push([...this.path, key].join('.'));
-        //             return this.nest(val)
-        //         } else {
-        //             that.accessedPaths && that.accessedPaths.push(path.join('.'));
-        //             return val
-        //         }
-        //     },
-        //     set(obj, prop, val) {
-        //         if (typeof val === 'object' && val !== null) {
-        //             value = this.nest(val)
-        //         }
-        //         obj[prop] = val;
-        //         that.changedObservable.next(this.path.join('.'));
-        //         return true;
-        //     }
-        // }
-        // return deepProxy(stateObj, proxyManager);//, { path: "state" }
         return proxyResult.proxy;
     }
 
@@ -1004,6 +982,7 @@ class exModifierAttribute extends exAttribute {
             x.stateManager.changedObservable.pipe(filter(path => this.#boundPaths.has(path)))
         );
         this.#boundPathSubscriptions = this.#boundPathObservables.map(x=>x.subscribe((data) => this.#onDataChanged(data)));
+        this.afterConnected && this.afterConnected();
     }
 
     getData() {
@@ -1344,6 +1323,32 @@ class exInclude extends exAttribute {
     }
 }
 
+class exModel extends exModifierAttribute {
+    dataCallback(data) {
+        this.element.value = data;
+    }
+
+    afterConnected() {
+        this.element.addEventListener("input", () => { 
+            this.runEvent(); 
+        });
+    }
+
+    runEvent() {
+        this.context.executeScopedExpression(`${this.binding} = elementValue`, { elementValue: this.element.value });
+    }
+}
+
+class exDisabled extends exModifierAttribute {
+    dataCallback(data) {
+        if (data) {
+            this.element.setAttribute("disabled","disabled");
+        }else {
+            this.element.removeAttribute("disabled");
+        }
+    }
+}
+
 class _attributeContainer {
     #registeredAttributes = new Map();
     /**
@@ -1376,6 +1381,8 @@ attributeContainer.registerAttribute("ex-repeat", exLoop);
 attributeContainer.registerAttribute("ex-if", exIf);
 attributeContainer.registerAttribute("ex-route", exRoute);
 attributeContainer.registerAttribute("ex-include", exInclude);
+attributeContainer.registerAttribute("ex-model", exModel);
+attributeContainer.registerAttribute("ex-disabled", exDisabled);
 
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 

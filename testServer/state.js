@@ -6,6 +6,8 @@ class one {
         }
     }
     allPeople = testData
+    name = "Hello World"
+    disableInput = false
 }
 
 export default one

@@ -7,6 +7,8 @@ import exLoop from "../../ex-attributes/ex-loop.js";
 import exIf from "../../ex-attributes/ex-if.js";
 import exRoute from "../../ex-attributes/ex-route.js";
 import exInclude from "../../ex-attributes/ex-include.js";
+import exModel from "../../ex-attributes/ex-model.js";
+import exDisabled from "../../ex-attributes/ex-disabled.js";
 
 class _attributeContainer {
     #registeredAttributes = new Map();
@@ -40,6 +42,7 @@ attributeContainer.registerAttribute("ex-repeat", exLoop);
 attributeContainer.registerAttribute("ex-if", exIf);
 attributeContainer.registerAttribute("ex-route", exRoute);
 attributeContainer.registerAttribute("ex-include", exInclude);
-
+attributeContainer.registerAttribute("ex-model", exModel);
+attributeContainer.registerAttribute("ex-disabled", exDisabled);
 
 export default attributeContainer;

@@ -19,10 +19,12 @@
             <ol>
                 <li><a href="#/repeat">Repeat</a></li>
                 <li><a href="#/model">Model</a></li>
-    
+                <li><a href="#/disabled">Disabled</a></li>
             </ol>
         </div>
         <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html">
+        </div>
+        <div is="ex-div" ex-if="route.path === '/disabled'" ex-include="/views/disabled.html">
         </div>
         <div is="ex-div" ex-if="route.path === '/repeat'">
             <table>

@@ -1,5 +1,4 @@
 import { Subject } from "rxjs";
-import deepProxy from "./state-proxy.js";
 import observableProxy from "./observerProxy.js";
 
 class stateManager {
@@ -40,29 +39,6 @@ class stateManager {
         let proxyResult = observableProxy(this.name, stateObj, valueSet);
         this.#getAccessedPaths = proxyResult.getLastPathAccessed;
         this.#resetPaths = proxyResult.resetPaths;
-        // const proxyManager = {
-        //     get(target, key, receiver) {
-        //         const val = Reflect.get(target, key, receiver);
-        //         let path = [...this.path, key];
-        //         that.accessedObservable.next(path);
-        //         if (typeof val === 'object' && val !== null) {
-        //             //that.accessedPaths && that.accessedPaths.push([...this.path, key].join('.'));
-        //             return this.nest(val)
-        //         } else {
-        //             that.accessedPaths && that.accessedPaths.push(path.join('.'));
-        //             return val
-        //         }
-        //     },
-        //     set(obj, prop, val) {
-        //         if (typeof val === 'object' && val !== null) {
-        //             value = this.nest(val)
-        //         }
-        //         obj[prop] = val;
-        //         that.changedObservable.next(this.path.join('.'));
-        //         return true;
-        //     }
-        // }
-        // return deepProxy(stateObj, proxyManager);//, { path: "state" }
         return proxyResult.proxy;
     }
 

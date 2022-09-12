@@ -40,6 +40,7 @@ class exModifierAttribute extends exAttribute {
             x.stateManager.changedObservable.pipe(filter(path => this.#boundPaths.has(path)))
         );
         this.#boundPathSubscriptions = this.#boundPathObservables.map(x=>x.subscribe((data) => this.#onDataChanged(data)));
+        this.afterConnected && this.afterConnected();
     }
 
     getData() {
