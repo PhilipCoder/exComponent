@@ -1,6 +1,6 @@
-1) ex-if
-2) ex-bind-html (sanitized html, one directional binding)
-3) ex-value
+1) ex-if  X
+2) ex-bind-html (sanitized html, one directional binding) X
+3) ex-model X
 4) ex-bind-disabled
 5) ex-bind-class
 7) ex-on-blur
