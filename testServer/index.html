@@ -6,7 +6,7 @@
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
     <title>Page Title</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <!-- <link rel='stylesheet' type='text/css' media='screen' href='main.css'> -->
+    <link rel='stylesheet' type='text/css' media='screen' href='main.css'> 
     <script src='ex-component.js' type="module">
     </script>
 </head>
@@ -20,32 +20,13 @@
                 <li><a href="#/repeat">Repeat</a></li>
                 <li><a href="#/model">Model</a></li>
                 <li><a href="#/disabled">Disabled</a></li>
+                <li><a href="#/class">Class</a></li>
             </ol>
         </div>
-        <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html">
-        </div>
-        <div is="ex-div" ex-if="route.path === '/disabled'" ex-include="/views/disabled.html">
-        </div>
-        <div is="ex-div" ex-if="route.path === '/repeat'">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Job Title</th>
-                        <th>Email</th>
-                        <th>Name</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr is="ex-tr" ex-repeat="{'person':state.allPeople}">
-                        <td is="ex-td" ex-bind="person.ID"></td>
-                        <td is="ex-td" ex-bind="person.JobTitle"></td>
-                        <td is="ex-td" ex-bind="person.EmailAddress"></td>
-                        <td is="ex-td" ex-bind="person.FirstNameLastName"></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html"></div>
+        <div is="ex-div" ex-if="route.path === '/disabled'" ex-include="/views/disabled.html"></div>
+        <div is="ex-div" ex-if="route.path === '/repeat'" ex-include="/views/repeat.html"></div>
+        <div is="ex-div" ex-if="route.path === '/class'" ex-include="/views/class.html"></div>
     </div>
 </body>
 

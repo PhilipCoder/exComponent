@@ -823,8 +823,11 @@ const observableProxy = (name, object, setCallback) => {
         let proxyHandler = {
             get(target, key, receiver) {
                 let result = target[key];
+                if (key === "__boundProp") {
+                    return result;
+                }
                 lastPathAccessed.push(`${path}.${key}`);
-                result = result === undefined ? {} : result;
+              //  result = result === undefined  ? {} : result;
                 if (typeof result === "object" && result.__objectPath === undefined) {
                     result = new Proxy(result, getHandler(`${path}.${key}`));
                     target[key] = result;
@@ -869,7 +872,7 @@ class stateManager {
         this.name = name;
     }
     //Fields
-    boundProp = "state"
+    __boundProp = "state"
     #state = null;
     #getAccessedPaths = null;
     #resetPaths = null;
@@ -1106,13 +1109,13 @@ class context {
 
     getScopedVariablesObj() {
         let result = Object.assign({}, this.scopedVariables);
-        Object.keys(result).forEach(x => result[x] = result[x].boundProp ? result[x][result[x].boundProp] : result[x]);
+        Object.keys(result).forEach(x => result[x] = result[x].__boundProp ? result[x][result[x].__boundProp] : result[x]);
         return result;
     }
 
     #getScopedVariables() {
         let scopeNames = Object.keys(this.scopedVariables);
-        let scopeValues = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x].boundProp ? this.scopedVariables[x][this.scopedVariables[x].boundProp] : this.scopedVariables[x]);
+        let scopeValues = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x].__boundProp ? this.scopedVariables[x][this.scopedVariables[x].__boundProp] : this.scopedVariables[x]);
         return { scopeNames, scopeValues };
     }
 
@@ -1349,6 +1352,15 @@ class exDisabled extends exModifierAttribute {
     }
 }
 
+class exClass extends exModifierAttribute {
+    dataCallback(data) {
+        for (let className in data){
+
+            (data[className] && this.element.classList.add(className)) || (!data[className] && this.element.classList.remove(className));
+        }
+    }
+}
+
 class _attributeContainer {
     #registeredAttributes = new Map();
     /**
@@ -1383,6 +1395,7 @@ attributeContainer.registerAttribute("ex-route", exRoute);
 attributeContainer.registerAttribute("ex-include", exInclude);
 attributeContainer.registerAttribute("ex-model", exModel);
 attributeContainer.registerAttribute("ex-disabled", exDisabled);
+attributeContainer.registerAttribute("ex-class", exClass);
 
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 

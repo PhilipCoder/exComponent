@@ -7,7 +7,7 @@ class stateManager {
         this.name = name;
     }
     //Fields
-    boundProp = "state"
+    __boundProp = "state"
     #state = null;
     #getAccessedPaths = null;
     #resetPaths = null;
