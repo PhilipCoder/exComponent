@@ -1,8 +1,8 @@
 1) ex-if  X
 2) ex-bind-html (sanitized html, one directional binding) X
 3) ex-model X
-4) ex-bind-disabled
-5) ex-bind-class
+4) ex-bind-disabled X
+5) ex-bind-class X
 7) ex-on-blur
 8) ex-on-change
 9) ex-bind-checked
