@@ -994,8 +994,8 @@ class exModifierAttribute extends exAttribute {
 }
 
 class exEventAttribute extends exAttribute {
-    runEvent() {
-        this.context.executeScopedExpression(this.binding);
+    runEvent(binding = this.binding) {
+        this.context.executeScopedExpression(binding);
     }
 }
 
@@ -1361,6 +1361,66 @@ class exClass extends exModifierAttribute {
     }
 }
 
+class exOnBlur extends exEventAttribute{
+    connectedCallback(){
+        this.element.addEventListener("blur", ()=>{this.runEvent();});
+    }
+
+    disconnectedCallback(){
+
+    }
+}
+
+class exOnChange extends exEventAttribute{
+    connectedCallback(){
+        this.element.addEventListener("change", ()=>{this.runEvent();});
+    }
+
+    disconnectedCallback(){
+
+    }
+}
+
+class exOnDblclick extends exEventAttribute{
+    connectedCallback(){
+        this.element.addEventListener("dblclick", ()=>{this.runEvent();});
+    }
+
+    disconnectedCallback(){
+
+    }
+}
+
+class exOnFocus extends exEventAttribute{
+    connectedCallback(){
+        this.element.addEventListener("focus", ()=>{this.runEvent();});
+    }
+
+    disconnectedCallback(){
+
+    }
+}
+
+class exOn extends exEventAttribute {
+    #events = [];
+    connectedCallback() {
+        let eventObj = Function(`return ${this.binding}`)();
+        for (let key in eventObj) {
+            this.#events.push(this.element.addEventListener(key, () => { this.runEvent(eventObj[key]); }));
+        }
+    }
+
+    disconnectedCallback() {
+        //this.#events.forEach(x=>this.element.removeEventListener(x));
+    }
+}
+
+class exThis extends exAttribute {
+    async connectedCallback() {
+        this.context.executeScopedStatement(`${this.binding} = ${this.binding}.bind(elm)`, { elm: this.element });
+    }
+}
+
 class _attributeContainer {
     #registeredAttributes = new Map();
     /**
@@ -1396,6 +1456,12 @@ attributeContainer.registerAttribute("ex-include", exInclude);
 attributeContainer.registerAttribute("ex-model", exModel);
 attributeContainer.registerAttribute("ex-disabled", exDisabled);
 attributeContainer.registerAttribute("ex-class", exClass);
+attributeContainer.registerAttribute("ex-on-blur", exOnBlur);
+attributeContainer.registerAttribute("ex-on-change", exOnChange);
+attributeContainer.registerAttribute("ex-on-dblclick", exOnDblclick);
+attributeContainer.registerAttribute("ex-on-focus", exOnFocus);
+attributeContainer.registerAttribute("ex-on", exOn);
+attributeContainer.registerAttribute("ex-this", exThis);
 
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 

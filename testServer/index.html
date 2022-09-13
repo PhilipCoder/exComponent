@@ -6,27 +6,34 @@
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
     <title>Page Title</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <link rel='stylesheet' type='text/css' media='screen' href='main.css'> 
+    <link rel="stylesheet" type="text/css" href="/style/bootstrap.min.css" />
+    <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
     <script src='ex-component.js' type="module">
     </script>
 </head>
 
 <body is="ex-body" ex-state="{state:'./state.js'}" ex-scope="{scope:'./scope.js'}">
-    <div is="ex-div" ex-route>
-        <h1>Hello World</h1>
-        
-        <div is="ex-div" ex-if="route.path === '/'">
+    <div is="ex-div" ex-route class="container">
+        <div class="row">
+            <h1>Hello World</h1>
+        </div>
+        <div is="ex-div" ex-if="route.path === '/'" class="row">
             <ol>
                 <li><a href="#/repeat">Repeat</a></li>
                 <li><a href="#/model">Model</a></li>
                 <li><a href="#/disabled">Disabled</a></li>
                 <li><a href="#/class">Class</a></li>
+                <li><a href="#/events">Events</a></li>
+                <li><a href="#/this">Events</a></li>
             </ol>
         </div>
-        <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html"></div>
-        <div is="ex-div" ex-if="route.path === '/disabled'" ex-include="/views/disabled.html"></div>
-        <div is="ex-div" ex-if="route.path === '/repeat'" ex-include="/views/repeat.html"></div>
-        <div is="ex-div" ex-if="route.path === '/class'" ex-include="/views/class.html"></div>
+        <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/disabled'" ex-include="/views/disabled.html" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/repeat'" ex-include="/views/repeat.html" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/class'" ex-include="/views/class.html" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/events'" ex-include="/views/events.html" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/this'" ex-include="/views/this.html" class="row"></div>
+
     </div>
 </body>
 

@@ -1,0 +1,30 @@
+<div class="col-12">
+    <div class="form">
+        <label class="control-label">blur</label>
+        <input is="ex-input" type="text" class="form-control" ex-on-blur="scope.output('Box blur')"/>
+    </div>
+</div>
+<div class="col-12">
+    <div class="form">
+        <label class="control-label">change</label>
+        <input is="ex-input" type="text" class="form-control" ex-on-change="scope.output('Box changed')"/>
+    </div>
+</div>
+<div class="col-12">
+    <div class="form">
+        <label class="control-label">Double Click</label>
+        <button is="ex-button" class="btn btn-primary" ex-on-dblclick="scope.output('Double Clicked')">Double Click Me</button>
+    </div>
+</div>
+<div class="col-12">
+    <div class="form">
+        <label class="control-label">Focus</label>
+        <input is="ex-input" type="text" class="form-control" ex-on-focus="scope.output('Textbox focussed')"/>
+    </div>
+</div>
+<div class="col-12">
+    <div class="form">
+        <label class="control-label">On (custom event)</label>
+        <input is="ex-input" type="text" class="form-control" ex-on="{'focusout':'scope.output(`Textbox focussed lost`)'}"/>
+    </div>
+</div>

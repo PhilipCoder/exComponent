@@ -10,6 +10,12 @@ import exInclude from "../../ex-attributes/ex-include.js";
 import exModel from "../../ex-attributes/ex-model.js";
 import exDisabled from "../../ex-attributes/ex-disabled.js";
 import exClass from "../../ex-attributes/ex-class.js";
+import exOnBlur from "../../ex-attributes/ex-on-blur.js";
+import exOnChange from "../../ex-attributes/ex-on-change.js";
+import exOnDblclick from "../../ex-attributes/ex-on-dblclick.js";
+import exOnFocus from "../../ex-attributes/ex-on-focus.js";
+import exOn from "../../ex-attributes/ex-on.js";
+import exThis from "../../ex-attributes/ex-this.js";
 
 class _attributeContainer {
     #registeredAttributes = new Map();
@@ -46,5 +52,13 @@ attributeContainer.registerAttribute("ex-include", exInclude);
 attributeContainer.registerAttribute("ex-model", exModel);
 attributeContainer.registerAttribute("ex-disabled", exDisabled);
 attributeContainer.registerAttribute("ex-class", exClass);
+attributeContainer.registerAttribute("ex-on-blur", exOnBlur);
+attributeContainer.registerAttribute("ex-on-change", exOnChange);
+attributeContainer.registerAttribute("ex-on-dblclick", exOnDblclick);
+attributeContainer.registerAttribute("ex-on-focus", exOnFocus);
+attributeContainer.registerAttribute("ex-on", exOn);
+attributeContainer.registerAttribute("ex-this", exThis);
+
+
 
 export default attributeContainer;

@@ -1,8 +1,8 @@
 import exAttribute from "./ex-attribute.js";
 
 class exEventAttribute extends exAttribute {
-    runEvent() {
-        this.context.executeScopedExpression(this.binding);
+    runEvent(binding = this.binding) {
+        this.context.executeScopedExpression(binding);
     }
 }
 

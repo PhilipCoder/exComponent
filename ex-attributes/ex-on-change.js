@@ -1,8 +1,8 @@
 import exEventAttribute from "../ex-component/ex-event-attribute.js";
 
-class exOnBlur extends exEventAttribute{
+class exOnChange extends exEventAttribute{
     connectedCallback(){
-        this.element.addEventListener("blur", ()=>{this.runEvent()});
+        this.element.addEventListener("change", ()=>{this.runEvent()});
     }
 
     disconnectedCallback(){
@@ -10,4 +10,4 @@ class exOnBlur extends exEventAttribute{
     }
 }
 
-export default exOnBlur;
+export default exOnChange;

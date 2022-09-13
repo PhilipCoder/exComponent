@@ -3,8 +3,14 @@ const myScope = async ({ state }) => {
         alertMe: () => {
             state.person.peronalDetails.name = state.person.peronalDetails.name + "schoeman";
         },
-        disable:()=>{
+        disable: () => {
             state.disableInput = !state.disableInput;
+        },
+        output: (value) => {
+            console.log(value);
+        },
+        focusElement:function(){
+            this.focus();
         }
 
     };
