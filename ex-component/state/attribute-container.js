@@ -16,6 +16,9 @@ import exOnDblclick from "../../ex-attributes/ex-on-dblclick.js";
 import exOnFocus from "../../ex-attributes/ex-on-focus.js";
 import exOn from "../../ex-attributes/ex-on.js";
 import exThis from "../../ex-attributes/ex-this.js";
+import exHide from "../../ex-attributes/ex-hide.js";
+import exHref from "../../ex-attributes/ex-href.js";
+import exCheck from "../../ex-attributes/ex-checked.js";
 
 class _attributeContainer {
     #registeredAttributes = new Map();
@@ -41,8 +44,8 @@ class _attributeContainer {
 }
 
 const attributeContainer = new _attributeContainer();
-attributeContainer.registerAttribute("ex-scope", exScope);
-attributeContainer.registerAttribute("ex-state", exState);
+attributeContainer.registerAttribute("ex-scopes", exScope);
+attributeContainer.registerAttribute("ex-states", exState);
 attributeContainer.registerAttribute("ex-bind", exBind);
 attributeContainer.registerAttribute("ex-on-click", exOnClick);
 attributeContainer.registerAttribute("ex-repeat", exLoop);
@@ -51,13 +54,17 @@ attributeContainer.registerAttribute("ex-route", exRoute);
 attributeContainer.registerAttribute("ex-include", exInclude);
 attributeContainer.registerAttribute("ex-model", exModel);
 attributeContainer.registerAttribute("ex-disabled", exDisabled);
-attributeContainer.registerAttribute("ex-class", exClass);
+attributeContainer.registerAttribute("ex-classes", exClass);
 attributeContainer.registerAttribute("ex-on-blur", exOnBlur);
 attributeContainer.registerAttribute("ex-on-change", exOnChange);
 attributeContainer.registerAttribute("ex-on-dblclick", exOnDblclick);
 attributeContainer.registerAttribute("ex-on-focus", exOnFocus);
 attributeContainer.registerAttribute("ex-on", exOn);
 attributeContainer.registerAttribute("ex-this", exThis);
+attributeContainer.registerAttribute("ex-hide", exHide);
+attributeContainer.registerAttribute("ex-href", exHref);
+attributeContainer.registerAttribute("ex-attributes", exHref);
+attributeContainer.registerAttribute("ex-checked", exCheck);
 
 
 

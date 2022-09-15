@@ -1421,6 +1421,41 @@ class exThis extends exAttribute {
     }
 }
 
+class exHide extends exModifierAttribute {
+    #displayStyle = window.getComputedStyle(this.element).display;
+    dataCallback(data) {
+        this.element.style.display = data ? (this.#displayStyle === "none" ? "inline-block" : this.#displayStyle) : "none";
+    }
+}
+
+class exHref extends exModifierAttribute {
+    dataCallback(data) {
+        this.element.href =data;
+    }
+}
+
+class exCheck extends exModifierAttribute {
+    #lastValue = false;
+    dataCallback(data) {
+        (!!data) ? this.element.setAttribute("checked", "true") : this.element.removeAttribute("checked");
+        this.element.checked = !!data;
+        this.#lastValue = (!!data);
+    }
+
+    afterConnected() {
+        this.element.addEventListener("click", () => {
+            this.runEvent();
+        });
+    }
+
+    runEvent() {
+        if ((!!this.element.checked) !== this.#lastValue) {
+            this.#lastValue = !!this.element.checked;
+            this.context.executeScopedExpression(`${this.binding} = elementValue`, { elementValue: this.#lastValue });
+        }
+    }
+}
+
 class _attributeContainer {
     #registeredAttributes = new Map();
     /**
@@ -1445,8 +1480,8 @@ class _attributeContainer {
 }
 
 const attributeContainer = new _attributeContainer();
-attributeContainer.registerAttribute("ex-scope", exScope);
-attributeContainer.registerAttribute("ex-state", exState);
+attributeContainer.registerAttribute("ex-scopes", exScope);
+attributeContainer.registerAttribute("ex-states", exState);
 attributeContainer.registerAttribute("ex-bind", exBind);
 attributeContainer.registerAttribute("ex-on-click", onClick);
 attributeContainer.registerAttribute("ex-repeat", exLoop);
@@ -1455,13 +1490,17 @@ attributeContainer.registerAttribute("ex-route", exRoute);
 attributeContainer.registerAttribute("ex-include", exInclude);
 attributeContainer.registerAttribute("ex-model", exModel);
 attributeContainer.registerAttribute("ex-disabled", exDisabled);
-attributeContainer.registerAttribute("ex-class", exClass);
+attributeContainer.registerAttribute("ex-classes", exClass);
 attributeContainer.registerAttribute("ex-on-blur", exOnBlur);
 attributeContainer.registerAttribute("ex-on-change", exOnChange);
 attributeContainer.registerAttribute("ex-on-dblclick", exOnDblclick);
 attributeContainer.registerAttribute("ex-on-focus", exOnFocus);
 attributeContainer.registerAttribute("ex-on", exOn);
 attributeContainer.registerAttribute("ex-this", exThis);
+attributeContainer.registerAttribute("ex-hide", exHide);
+attributeContainer.registerAttribute("ex-href", exHref);
+attributeContainer.registerAttribute("ex-attributes", exHref);
+attributeContainer.registerAttribute("ex-checked", exCheck);
 
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 

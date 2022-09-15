@@ -9,8 +9,9 @@
 12) ex-on-dbl-click X
 13) ex-bind-disabled X
 14) ex-on-focus X
-15) ex-bind-hide
-16) ex-bind-href
-18) ex-bind-attribute
-20) ex-bind-style
+15) ex-bind-hide x
+16) ex-bind-href t
+18) ex-bind-attribute t
+20) ex-bind-style t
 9) ex-bind-checked
+21) ex-clear-scope

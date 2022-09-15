@@ -12,7 +12,7 @@
     </script>
 </head>
 
-<body is="ex-body" ex-state="{state:'./state.js'}" ex-scope="{scope:'./scope.js'}">
+<body is="ex-body" ex-states="{state:'./state.js'}" ex-scopes="{scope:'./scope.js'}">
     <div is="ex-div" ex-route class="container">
         <div class="row">
             <h1>Hello World</h1>
@@ -25,6 +25,8 @@
                 <li><a href="#/class">Class</a></li>
                 <li><a href="#/events">Events</a></li>
                 <li><a href="#/this">Events</a></li>
+                <li><a href="#/hide">Hide</a></li>
+                <li><a href="#/checked">Checked</a></li>
             </ol>
         </div>
         <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html" class="row"></div>
@@ -33,6 +35,7 @@
         <div is="ex-div" ex-if="route.path === '/class'" ex-include="/views/class.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/events'" ex-include="/views/events.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/this'" ex-include="/views/this.html" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/checked'" ex-include="/views/checked.html" class="row"></div>
 
     </div>
 </body>
