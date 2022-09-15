@@ -2,18 +2,15 @@ import elementAttributeManager from "./helpers/attributeActivator.js"
 import { getComponentContext } from "./helpers/state-helpers.js";
 import { context } from "./state/context.js";
 import detachedElementContainer from "./state/detached-element-container.js";
-class exComponent extends HTMLElement {
-    newContext = false;
-    get scope() {
-        return this.context.getScopedVariablesObj();
-    }
+class exElement  
+{
 
     get context() {
         this._context = this._context || getComponentContext(this);
         return this._context
     }
     set context(value) {
-        this._context = value;
+        this._context =  value;
     }
 
     get attributeManager() {
@@ -31,28 +28,28 @@ class exComponent extends HTMLElement {
 
     createContext(newScope) {
         if (!this._context) {
-            let parentScope = newScope ? [] : (this.context?.scopedVariables || []);
+            let parentScope =  newScope ? [] : (this.context?.scopedVariables || []);
             this._context = new context(parentScope);
         }
     }
 
     async connectedCallback() {
-        if (this.isConnected) {
-            console.log("component");
-            this.newContext && this.createContext(this.newContext);
-            await this.attributeManager.connectedCallback(this);
-            this.onConnected && this.onConnected();
-        }
+        await this.attributeManager.connectedCallback(this);
     }
 
     disconnectedCallback() {
         this.attributeManager.disconnectedCallback(this);
         detachedElementContainer.parentDisconnected(this);
-        this.onDisconnected && this.onDisconnected();
     }
 
+    static InheritFrom(classDef) {
+        Object.getOwnPropertyNames(exElement.prototype).
+            filter(x => x !== "constructor").
+            forEach(x => Object.defineProperty(classDef.prototype, x, Object.getOwnPropertyDescriptor(exElement.prototype, x)));
+        return classDef;
+    }
 }
 
 
 
-export default exComponent;
+export default exElement;

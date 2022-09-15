@@ -8,7 +8,6 @@ class exInclude extends exAttribute {
             let html = await response.text();
             this.element.innerHTML = html;
         }
-
     }
 }
 

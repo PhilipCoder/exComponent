@@ -5,8 +5,10 @@ class exState extends exAttribute {
     static Priority = 5;
     async connectedCallback() {
         let innerHTML = this.element.innerHTML;
+        console.log("state");
         this.element.innerHTML = "";
         let scopeObj = await Function(`return ${this.binding}`)();
+        this.element.createContext();
         for (let scopeVarName in scopeObj) {
             let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();
             if (Object.keys(module).length === 0) {
@@ -22,7 +24,6 @@ class exState extends exAttribute {
 
             let stateManagerInstance = new stateManager(scopeVarName);
             stateManagerInstance.state = module;
-            this.element.createContext();
             this.element.context.addVariable(scopeVarName, stateManagerInstance);
         }
         this.element.innerHTML = innerHTML;
