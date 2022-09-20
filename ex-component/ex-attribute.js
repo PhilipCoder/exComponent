@@ -1,5 +1,6 @@
 class exAttribute {
-    boundPaths = {}
+    boundPaths = {};
+
     /**@type{HTMLElement} */
     element = null
     static Priority = 0;
@@ -14,11 +15,13 @@ class exAttribute {
     }
 
     connectedCallback() {
-
+        this.onConnected?.();
+        this.init?.();
     }
 
     disconnectedCallback() {
-
+        this.onDisconnected?.();
+        this.onLoad?.();
     }
 }
 

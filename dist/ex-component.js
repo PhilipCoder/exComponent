@@ -917,7 +917,8 @@ class stateManager {
 }
 
 class exAttribute {
-    boundPaths = {}
+    boundPaths = {};
+
     /**@type{HTMLElement} */
     element = null
     static Priority = 0;
@@ -932,11 +933,13 @@ class exAttribute {
     }
 
     connectedCallback() {
-
+        this.onConnected?.();
+        this.init?.();
     }
 
     disconnectedCallback() {
-
+        this.onDisconnected?.();
+        this.onLoad?.();
     }
 }
 
@@ -994,6 +997,19 @@ class exModifierAttribute extends exAttribute {
 }
 
 class exEventAttribute extends exAttribute {
+    events = [];
+
+    addEvent(eventName, eventFunction) {
+        this.events.push({ eventName, eventFunction });
+        this.element.addEventListener(eventName, eventFunction);
+    }
+
+    onDisconnected(){
+        for (let eventItem of this.events){
+            this.element.removeEventListener(eventItem.eventName, eventItem.eventFunction);
+        }
+    }
+
     runEvent(binding = this.binding) {
         this.context.executeScopedExpression(binding);
     }
@@ -1079,12 +1095,8 @@ class exBind extends exModifierAttribute {
 }
 
 class onClick extends exEventAttribute{
-    connectedCallback(){
-        this.element.addEventListener("click", ()=>{this.runEvent();});
-    }
-
-    disconnectedCallback(){
-
+    init(){
+        this.addEvent("click", ()=>{this.runEvent();});
     }
 }
 
@@ -1362,56 +1374,37 @@ class exClass extends exModifierAttribute {
 }
 
 class exOnBlur extends exEventAttribute{
-    connectedCallback(){
-        this.element.addEventListener("blur", ()=>{this.runEvent();});
-    }
-
-    disconnectedCallback(){
-
+    init(){
+        this.addEvent("blur", ()=>{this.runEvent();});
     }
 }
 
 class exOnChange extends exEventAttribute{
-    connectedCallback(){
-        this.element.addEventListener("change", ()=>{this.runEvent();});
-    }
-
-    disconnectedCallback(){
-
+    init(){
+        this.addEvent("change", ()=>{this.runEvent();});
     }
 }
 
 class exOnDblclick extends exEventAttribute{
-    connectedCallback(){
-        this.element.addEventListener("dblclick", ()=>{this.runEvent();});
-    }
-
-    disconnectedCallback(){
-
+    init(){
+        this.addEvent("dblclick", ()=>{this.runEvent();});
     }
 }
 
-class exOnFocus extends exEventAttribute{
-    connectedCallback(){
-        this.element.addEventListener("focus", ()=>{this.runEvent();});
-    }
-
-    disconnectedCallback(){
-
+class exOnFocus extends exEventAttribute {
+    init() {
+        this.addEvent("focus", () => { this.runEvent(); });
     }
 }
 
 class exOn extends exEventAttribute {
-    #events = [];
-    connectedCallback() {
+    init(){
         let eventObj = Function(`return ${this.binding}`)();
         for (let key in eventObj) {
-            this.#events.push(this.element.addEventListener(key, () => { this.runEvent(eventObj[key]); }));
+            this.addEvent(key,  () => { 
+                this.runEvent(eventObj[key]); 
+            });
         }
-    }
-
-    disconnectedCallback() {
-        //this.#events.forEach(x=>this.element.removeEventListener(x));
     }
 }
 

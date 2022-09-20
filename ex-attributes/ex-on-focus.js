@@ -1,12 +1,8 @@
 import exEventAttribute from "../ex-component/ex-event-attribute.js";
 
-class exOnFocus extends exEventAttribute{
-    connectedCallback(){
-        this.element.addEventListener("focus", ()=>{this.runEvent()});
-    }
-
-    disconnectedCallback(){
-
+class exOnFocus extends exEventAttribute {
+    init() {
+        this.addEvent("focus", () => { this.runEvent() });
     }
 }
 
