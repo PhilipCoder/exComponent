@@ -28,7 +28,7 @@ class elementAttributeManager{
 
         for (let attributeDef of attributeDefinitions) {
             let attributeInstance = new attributeDef.attributeDef(element, attributeDef.value);
-
+            attributeInstance.tagName = attributeDef.name;
             this.#attributes.push(attributeInstance);
 
             await attributeInstance.connectedCallback(element.context);

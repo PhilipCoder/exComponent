@@ -6,6 +6,7 @@ class exAttribute {
     #events = [];
     #boundPathObservables = [];
     #boundPathSubscriptions = [];
+    tagName = "";
 
     /** Instance of the HTML element the attribute is bound to.
      * @type{HTMLElement} 
@@ -31,7 +32,6 @@ class exAttribute {
     connectedCallback() {
         this.onConnected?.();
         this.init?.();
-        this.unbindEvents();
         this.dataCallback && this.bindElement();
     }
 
@@ -39,6 +39,7 @@ class exAttribute {
         this.onDisconnected?.();
         this.onLoad?.();
         this.dataCallback && this.unbindAttribute();
+        this.unbindEvents();
     }
 
     unbindEvents(){
@@ -49,7 +50,7 @@ class exAttribute {
 
     //Events
     addEvent(eventName, eventFunction) {
-        this.events.push({ eventName, eventFunction });
+        this.#events.push({ eventName, eventFunction });
         this.element.addEventListener(eventName, eventFunction);
     }
 

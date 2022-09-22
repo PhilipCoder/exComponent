@@ -921,6 +921,7 @@ class exAttribute {
     #events = [];
     #boundPathObservables = [];
     #boundPathSubscriptions = [];
+    tagName = "";
 
     /** Instance of the HTML element the attribute is bound to.
      * @type{HTMLElement} 
@@ -946,7 +947,6 @@ class exAttribute {
     connectedCallback() {
         this.onConnected?.();
         this.init?.();
-        this.unbindEvents();
         this.dataCallback && this.bindElement();
     }
 
@@ -954,6 +954,7 @@ class exAttribute {
         this.onDisconnected?.();
         this.onLoad?.();
         this.dataCallback && this.unbindAttribute();
+        this.unbindEvents();
     }
 
     unbindEvents(){
@@ -964,7 +965,7 @@ class exAttribute {
 
     //Events
     addEvent(eventName, eventFunction) {
-        this.events.push({ eventName, eventFunction });
+        this.#events.push({ eventName, eventFunction });
         this.element.addEventListener(eventName, eventFunction);
     }
 
@@ -1169,17 +1170,47 @@ class context {
 
 class _detachedElementContainer {
     detachedElements = new Map();
+    positionMarkerElements = new Map();
 
     addElement(parentElement, element) {
         let elements = [...(this.detachedElements.get(parentElement)) || [], element];
         this.detachedElements.set(parentElement, elements);
     }
 
-    parentDisconnected(element){
+    parentDisconnected(element) {
         this.detachedElements.get(element)?.forEach(element => {
             element?.disconnectedCallback();
             element.unbindAttribute && element.unbindAttribute();
         });
+    }
+
+    detach(element, comment) {
+        if (!element.isConnected) return;
+        let positionMarker = document.createComment(comment || "Position Marker");
+        element.parentElement.insertBefore(positionMarker, element);
+        element.parentElement.removeChild(element);
+        this.addElement(element);
+        this.positionMarkerElements.set(element, positionMarker);
+    }
+
+    attach(element) {
+        let positionMarker = this.positionMarkerElements.get(element);
+        if (element.isConnected || !positionMarker) return;
+        positionMarker.parentElement.insertBefore(element, positionMarker);
+        positionMarker.parentElement.removeChild(positionMarker);
+        this.positionMarkerElements.delete(element);
+    }
+
+    attachReplacement(element, replacement) {
+        let positionMarker = this.positionMarkerElements.get(element);
+        if (element.isConnected || replacement.isConnected || !positionMarker) return;
+        positionMarker.parentElement.insertBefore(replacement, positionMarker);
+        positionMarker.parentElement.removeChild(positionMarker);
+        this.positionMarkerElements.delete(element);
+    }
+
+    isAttached(element){
+        return !this.positionMarkerElements.get(element);
     }
 }
 
@@ -1211,7 +1242,8 @@ class exLoop extends exAttribute {
             this.#toDuplicate.removeAttribute("ex-repeat");
             detachedElementContainer.addElement(this.element.parentElement, this);
             this.#documentElement = this.element.parentElement;
-            this.element.parentElement.removeChild(this.element);
+            //this.element.parentElement.removeChild(this.element);
+            detachedElementContainer.detach(this.element, `Removed by: ${this.tagName}; Expression: ${this.binding}`);
         }
         for (let toRemove of this.#duplicatedItems) {
             this.element.parentElement.removeChild(toRemove);
@@ -1235,48 +1267,34 @@ class exLoop extends exAttribute {
     }
 }
 
-function uuidv4() {
-    return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-      (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-    );
-  }
-
 class exIf extends exAttribute {
     /**@type {HTMLElement} */
     #parentNode = null
-    #isAttached = true;
     static Priority = 2;
-    #elementId = uuidv4();
-    #comment = null;
     #toInsert = null;
     #element = null;
     #originalElement = null;
     disconnectedCallback() {
     }
 
+    onConnected(){
+        this.#parentNode = this.element.parentElement;
+        this.element.removeAttribute("ex-if");
+        this.#toInsert = this.element.cloneNode(true);
+        this.#element = this.element;
+        this.#originalElement = this.element.cloneNode(true);
+        detachedElementContainer.addElement(this.element.parentElement, this);
+    }
+
 
     dataCallback(data) {
-        if (!this.#parentNode) {
-            this.#parentNode = this.element.parentElement;
-            this.element.removeAttribute("ex-if");
-            this.#toInsert = this.element.cloneNode(true);
-            this.#element = this.element;
-            this.#originalElement =  this.element.cloneNode(true);
-            detachedElementContainer.addElement(this.element.parentElement, this);
-        }
         let shouldAttach = !!data;
-        if (this.#isAttached && !shouldAttach) {
-         
-            this.#comment = document.createComment(this.#elementId);
-            this.#parentNode.insertBefore(this.#comment,this.#element);
-            this.#parentNode.removeChild(this.#element);
-            this.#isAttached = false;
-        } else if (!this.#isAttached && shouldAttach) {
+        if (detachedElementContainer.isAttached(this.#element) && !shouldAttach) {
+            detachedElementContainer.detach(this.#element, `Removed by: ${this.tagName}; Expression: ${this.binding}`);
+        } else if (!detachedElementContainer.isAttached(this.#element)  && shouldAttach) {
             this.#toInsert = this.#originalElement.cloneNode(true);
-            this.#parentNode.insertBefore(this.#toInsert,this.#comment);
-            this.#parentNode.removeChild(this.#comment);
+            detachedElementContainer.attachReplacement(this.#element, this.#toInsert);
             this.#element = this.#toInsert;
-            this.#isAttached = true;
         }
 
     }
@@ -1530,7 +1548,7 @@ class elementAttributeManager{
 
         for (let attributeDef of attributeDefinitions) {
             let attributeInstance = new attributeDef.attributeDef(element, attributeDef.value);
-
+            attributeInstance.tagName = attributeDef.name;
             this.#attributes.push(attributeInstance);
 
             await attributeInstance.connectedCallback(element.context);
