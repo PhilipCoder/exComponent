@@ -1,6 +1,6 @@
-import exModifierAttribute from "../ex-component/ex-modifier-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 
-class exHref extends exModifierAttribute {
+class exHref extends exAttribute {
     dataCallback(data) {
         this.element.href =data
     }

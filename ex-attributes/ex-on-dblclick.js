@@ -1,6 +1,6 @@
-import exEventAttribute from "../ex-component/ex-event-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 
-class exOnDblclick extends exEventAttribute{
+class exOnDblclick extends exAttribute{
     init(){
         this.addEvent("dblclick", ()=>{this.runEvent()});
     }

@@ -1,6 +1,5 @@
-import exEventAttribute from "../ex-component/ex-event-attribute.js";
-
-class exOnBlur extends exEventAttribute{
+import exAttribute from "../ex-component/ex-attribute.js";
+class exOnBlur extends exAttribute{
     init(){
         this.addEvent("blur", ()=>{this.runEvent()});
     }

@@ -1,6 +1,6 @@
-import exModifierAttribute from "../ex-component/ex-modifier-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 
-class exBind extends exModifierAttribute {
+class exBind extends exAttribute {
     dataCallback(data) {
         this.element.innerHTML = data;
     }

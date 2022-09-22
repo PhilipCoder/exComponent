@@ -1,4 +1,4 @@
-import exModifierAttribute from "../ex-component/ex-modifier-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 import detachedElementContainer from "../ex-component/state/detached-element-container.js";
 
 
@@ -8,7 +8,7 @@ function uuidv4() {
     );
   }
 
-class exIf extends exModifierAttribute {
+class exIf extends exAttribute {
     /**@type {HTMLElement} */
     #parentNode = null
     #isAttached = true;

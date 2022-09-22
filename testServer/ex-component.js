@@ -917,16 +917,27 @@ class stateManager {
 }
 
 class exAttribute {
-    boundPaths = {};
+    #boundPaths = new Set();
+    #events = [];
+    #boundPathObservables = [];
+    #boundPathSubscriptions = [];
 
-    /**@type{HTMLElement} */
+    /** Instance of the HTML element the attribute is bound to.
+     * @type{HTMLElement} 
+     * */
     element = null
+    /** Indicates the order the attributes are executed.
+     * Higher values will execute first
+     */
     static Priority = 0;
 
+    /**Constructor, should not be over be called in inherited classes*/
     constructor(element, binding) {
         this.element = element;
         this.binding = binding;
+        this.onConstructed?.();
     }
+
 
     get context() {
         return this.element.context;
@@ -935,31 +946,39 @@ class exAttribute {
     connectedCallback() {
         this.onConnected?.();
         this.init?.();
+        this.unbindEvents();
+        this.dataCallback && this.bindElement();
     }
 
     disconnectedCallback() {
         this.onDisconnected?.();
         this.onLoad?.();
+        this.dataCallback && this.unbindAttribute();
     }
-}
 
-const exceptionLogger = {
-    logError: (exception) => {
-        throw exception;
+    unbindEvents(){
+        for (let eventItem of this.#events){
+            this.element.removeEventListener(eventItem.eventName, eventItem.eventFunction);
+        }
     }
-};
 
-class exModifierAttribute extends exAttribute {
-    #boundPaths = new Set();
-    #boundPathObservables = [];
-    #boundPathSubscriptions = [];
+    //Events
+    addEvent(eventName, eventFunction) {
+        this.events.push({ eventName, eventFunction });
+        this.element.addEventListener(eventName, eventFunction);
+    }
 
-    disconnectedCallback() {
+    runEvent(binding = this.binding) {
+        this.context.executeScopedExpression(binding);
+    }
+
+    //bound attributes
+    unbindAttribute() {
         this.#boundPathSubscriptions.forEach(x=>x.unsubscribe());
     }
 
-    dataCallback(data) {
-    }
+    // dataCallback(data) {
+    // }
 
     #onDataChanged() {
         this.dataCallback(this.getData());
@@ -969,7 +988,7 @@ class exModifierAttribute extends exAttribute {
         this.#boundPathSubscriptions.forEach(x=>x.unsubscribe());
     }
 
-    connectedCallback() {
+    bindElement() {
         let stateManagers = this.context.getOfType(stateManager);
         let pathFuncs = stateManagers.map(x => ({ stateManager: x, paths: x.GetAccessedPaths() }));
         let boundValue = this.getData();
@@ -994,26 +1013,14 @@ class exModifierAttribute extends exAttribute {
     getData() {
         return this.context.executeScopedExpression(this.binding);
     }
+    
 }
 
-class exEventAttribute extends exAttribute {
-    events = [];
-
-    addEvent(eventName, eventFunction) {
-        this.events.push({ eventName, eventFunction });
-        this.element.addEventListener(eventName, eventFunction);
+const exceptionLogger = {
+    logError: (exception) => {
+        throw exception;
     }
-
-    onDisconnected(){
-        for (let eventItem of this.events){
-            this.element.removeEventListener(eventItem.eventName, eventItem.eventFunction);
-        }
-    }
-
-    runEvent(binding = this.binding) {
-        this.context.executeScopedExpression(binding);
-    }
-}
+};
 
 class exScope extends exAttribute {
     static Priority = 4;
@@ -1089,13 +1096,13 @@ class exState extends exAttribute {
     }
 }
 
-class exBind extends exModifierAttribute {
+class exBind extends exAttribute {
     dataCallback(data) {
         this.element.innerHTML = data;
     }
 }
 
-class onClick extends exEventAttribute{
+class onClick extends exAttribute{
     init(){
         this.addEvent("click", ()=>{this.runEvent();});
     }
@@ -1171,14 +1178,14 @@ class _detachedElementContainer {
     parentDisconnected(element){
         this.detachedElements.get(element)?.forEach(element => {
             element?.disconnectedCallback();
-            element.unsubscribe && element.unsubscribe();
+            element.unbindAttribute && element.unbindAttribute();
         });
     }
 }
 
 const detachedElementContainer = new _detachedElementContainer();
 
-class exLoop extends exModifierAttribute {
+class exLoop extends exAttribute {
     #duplicatedItems = [];
     #originalElement = null;
     #toDuplicate = null;
@@ -1234,7 +1241,7 @@ function uuidv4() {
     );
   }
 
-class exIf extends exModifierAttribute {
+class exIf extends exAttribute {
     /**@type {HTMLElement} */
     #parentNode = null
     #isAttached = true;
@@ -1306,20 +1313,12 @@ class exRoute extends exAttribute {
         let routeValues = getHashValues();
         let stateManagerInstance = new stateManager("route");
         stateManagerInstance.state = { path: routeValues.path };
-   //     this.element.createContext();
         this.element.context.addVariable("route", stateManagerInstance);
         let attributeInstance = this;
         window.onpopstate = (event) => {
             let routeValues = getHashValues();
             attributeInstance.context.scopedVariables["route"].state.path = routeValues.path;
-        //    attributeInstance.context.executeScopedStatement("route.path = hashPath", { hashPath: routeValues.path })
         };
-        // window.addEventListener('locationchange', function () {
-        //     console.log('onlocationchange event occurred!');
-        // })
-        // window.addEventListener('hashchange', function () {
-        //     console.log('onhashchange event occurred!');
-        // })
     }
 
     disconnectedCallback() {
@@ -1338,7 +1337,7 @@ class exInclude extends exAttribute {
     }
 }
 
-class exModel extends exModifierAttribute {
+class exModel extends exAttribute {
     dataCallback(data) {
         this.element.value = data;
     }
@@ -1354,7 +1353,7 @@ class exModel extends exModifierAttribute {
     }
 }
 
-class exDisabled extends exModifierAttribute {
+class exDisabled extends exAttribute {
     dataCallback(data) {
         if (data) {
             this.element.setAttribute("disabled","disabled");
@@ -1364,7 +1363,7 @@ class exDisabled extends exModifierAttribute {
     }
 }
 
-class exClass extends exModifierAttribute {
+class exClass extends exAttribute {
     dataCallback(data) {
         for (let className in data){
 
@@ -1373,31 +1372,31 @@ class exClass extends exModifierAttribute {
     }
 }
 
-class exOnBlur extends exEventAttribute{
+class exOnBlur extends exAttribute{
     init(){
         this.addEvent("blur", ()=>{this.runEvent();});
     }
 }
 
-class exOnChange extends exEventAttribute{
+class exOnChange extends exAttribute{
     init(){
         this.addEvent("change", ()=>{this.runEvent();});
     }
 }
 
-class exOnDblclick extends exEventAttribute{
+class exOnDblclick extends exAttribute{
     init(){
         this.addEvent("dblclick", ()=>{this.runEvent();});
     }
 }
 
-class exOnFocus extends exEventAttribute {
+class exOnFocus extends exAttribute {
     init() {
         this.addEvent("focus", () => { this.runEvent(); });
     }
 }
 
-class exOn extends exEventAttribute {
+class exOn extends exAttribute {
     init(){
         let eventObj = Function(`return ${this.binding}`)();
         for (let key in eventObj) {
@@ -1414,20 +1413,20 @@ class exThis extends exAttribute {
     }
 }
 
-class exHide extends exModifierAttribute {
+class exHide extends exAttribute {
     #displayStyle = window.getComputedStyle(this.element).display;
     dataCallback(data) {
         this.element.style.display = data ? (this.#displayStyle === "none" ? "inline-block" : this.#displayStyle) : "none";
     }
 }
 
-class exHref extends exModifierAttribute {
+class exHref extends exAttribute {
     dataCallback(data) {
         this.element.href =data;
     }
 }
 
-class exCheck extends exModifierAttribute {
+class exCheck extends exAttribute {
     #lastValue = false;
     dataCallback(data) {
         (!!data) ? this.element.setAttribute("checked", "true") : this.element.removeAttribute("checked");
@@ -1507,14 +1506,10 @@ attributeContainer.registerAttribute("ex-clear-state", exClearState);
 
 class elementAttributeManager{
 
-    #eventAttributes = []
-    #modifierAttributes = []
-    #otherAttributes = []
+    #attributes = []
 
     disconnectedCallback(element) {
-        this.#modifierAttributes.forEach(x => x.disconnectedCallback());
-        this.#eventAttributes.forEach(x => x.disconnectedCallback());
-        this.#otherAttributes.forEach(x => x.disconnectedCallback());
+        this.#attributes.forEach(x => x.disconnectedCallback());
     }
 
     async connectedCallback(element) {
@@ -1536,11 +1531,7 @@ class elementAttributeManager{
         for (let attributeDef of attributeDefinitions) {
             let attributeInstance = new attributeDef.attributeDef(element, attributeDef.value);
 
-            attributeInstance instanceof exModifierAttribute ?
-            this.#modifierAttributes.push(attributeInstance) :
-                attributeInstance instanceof exEventAttribute ?
-                this.#eventAttributes.push(attributeInstance) :
-                this.#otherAttributes.push(attributeInstance);
+            this.#attributes.push(attributeInstance);
 
             await attributeInstance.connectedCallback(element.context);
         }
@@ -1815,4 +1806,4 @@ var exAttributeContainer = new Proxy({
     }
 });
 
-export { exAttributeContainer as attributeContainer, exAttribute, exComponent, exCustomElements as exDiv, exEventAttribute, exIncludeHtml, exModifierAttribute, exScope, exState, stateManager };
+export { exAttributeContainer as attributeContainer, exAttribute, exComponent, exCustomElements as exDiv, exIncludeHtml, stateManager };

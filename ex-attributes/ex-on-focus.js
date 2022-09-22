@@ -1,6 +1,6 @@
-import exEventAttribute from "../ex-component/ex-event-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 
-class exOnFocus extends exEventAttribute {
+class exOnFocus extends exAttribute {
     init() {
         this.addEvent("focus", () => { this.runEvent() });
     }

@@ -9,7 +9,7 @@ class _detachedElementContainer {
     parentDisconnected(element){
         this.detachedElements.get(element)?.forEach(element => {
             element?.disconnectedCallback();
-            element.unsubscribe && element.unsubscribe();
+            element.unbindAttribute && element.unbindAttribute();
         });
     }
 }

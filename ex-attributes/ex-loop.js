@@ -1,8 +1,8 @@
-import exModifierAttribute from "../ex-component/ex-modifier-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 import { context } from "../ex-component/state/context.js";
 import detachedElementContainer from "../ex-component/state/detached-element-container.js";
 
-class exLoop extends exModifierAttribute {
+class exLoop extends exAttribute {
     #duplicatedItems = [];
     #originalElement = null;
     #toDuplicate = null;

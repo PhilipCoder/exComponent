@@ -1,6 +1,6 @@
-import exModifierAttribute from "../ex-component/ex-modifier-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 
-class exCheck extends exModifierAttribute {
+class exCheck extends exAttribute {
     #lastValue = false;
     dataCallback(data) {
         (!!data) ? this.element.setAttribute("checked", "true") : this.element.removeAttribute("checked");

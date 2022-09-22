@@ -1,6 +1,6 @@
-import exModifierAttribute from "../ex-component/ex-modifier-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 
-class exAttributes extends exModifierAttribute {
+class exAttributes extends exAttribute {
     dataCallback(data) {
         for (let key in data){
             this.element.setAttribute(key, data[key]);

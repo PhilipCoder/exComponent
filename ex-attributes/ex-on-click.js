@@ -1,6 +1,6 @@
-import exEventAttribute from "../ex-component/ex-event-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 
-class onClick extends exEventAttribute{
+class onClick extends exAttribute{
     init(){
         this.addEvent("click", ()=>{this.runEvent()});
     }

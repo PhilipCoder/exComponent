@@ -1,19 +1,13 @@
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 import { exceptionLogger } from "./exception-logger.js";
-import exModifierAttribute from "../ex-modifier-attribute.js";
-import exEventAttribute from "../ex-event-attribute.js";
 import attributeContainer from "../state/attribute-container.js";
 
 class elementAttributeManager{
 
-    #eventAttributes = []
-    #modifierAttributes = []
-    #otherAttributes = []
+    #attributes = []
 
     disconnectedCallback(element) {
-        this.#modifierAttributes.forEach(x => x.disconnectedCallback());
-        this.#eventAttributes.forEach(x => x.disconnectedCallback());
-        this.#otherAttributes.forEach(x => x.disconnectedCallback());
+        this.#attributes.forEach(x => x.disconnectedCallback());
     }
 
     async connectedCallback(element) {
@@ -35,11 +29,7 @@ class elementAttributeManager{
         for (let attributeDef of attributeDefinitions) {
             let attributeInstance = new attributeDef.attributeDef(element, attributeDef.value);
 
-            attributeInstance instanceof exModifierAttribute ?
-            this.#modifierAttributes.push(attributeInstance) :
-                attributeInstance instanceof exEventAttribute ?
-                this.#eventAttributes.push(attributeInstance) :
-                this.#otherAttributes.push(attributeInstance);
+            this.#attributes.push(attributeInstance);
 
             await attributeInstance.connectedCallback(element.context);
         }

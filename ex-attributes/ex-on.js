@@ -1,6 +1,6 @@
-import exEventAttribute from "../ex-component/ex-event-attribute.js";
+import exAttribute from "../ex-component/ex-attribute.js";
 
-class exOn extends exEventAttribute {
+class exOn extends exAttribute {
     init(){
         let eventObj = Function(`return ${this.binding}`)();
         for (let key in eventObj) {
