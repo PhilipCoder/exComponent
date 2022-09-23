@@ -1,4 +1,4 @@
-import exAttribute from "../ex-attribute.js";
+import exAttribute from "../../ex-attribute/ex-attribute.js";
 import exScope from "../../ex-attributes/ex-scope.js";
 import exState from "../../ex-attributes/ex-state.js";
 import exBind from "../../ex-attributes/ex-bind.js";

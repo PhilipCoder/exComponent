@@ -1,4 +1,4 @@
-import exAttribute from "../ex-component/ex-attribute.js";
+import exAttribute from "../ex-attribute/ex-attribute.js";
 
 class exClearState extends exAttribute {
     static Priority = 5;

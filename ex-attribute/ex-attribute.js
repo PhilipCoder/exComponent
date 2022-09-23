@@ -1,4 +1,4 @@
-import stateManager from "./state/state-manager.js";
+import stateManager from "../ex-component/state/state-manager.js"
 import { filter } from "rxjs";
 
 class exAttribute {

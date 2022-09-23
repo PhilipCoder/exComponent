@@ -1,4 +1,4 @@
-import exAttribute from "../ex-component/ex-attribute.js";
+import exAttribute from "../ex-attribute/ex-attribute.js";
 import detachedElementContainer from "../ex-component/state/detached-element-container.js";
 
 class exIf extends exAttribute {
