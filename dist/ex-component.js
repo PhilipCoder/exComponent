@@ -1242,7 +1242,6 @@ class exLoop extends exAttribute {
             this.#toDuplicate.removeAttribute("ex-repeat");
             detachedElementContainer.addElement(this.element.parentElement, this);
             this.#documentElement = this.element.parentElement;
-            //this.element.parentElement.removeChild(this.element);
             detachedElementContainer.detach(this.element, `Removed by: ${this.tagName}; Expression: ${this.binding}`);
         }
         for (let toRemove of this.#duplicatedItems) {
@@ -1283,17 +1282,17 @@ class exIf extends exAttribute {
         this.#toInsert = this.element.cloneNode(true);
         this.#element = this.element;
         this.#originalElement = this.element.cloneNode(true);
-        detachedElementContainer.addElement(this.element.parentElement, this);
+        this.element.persistInstance();
     }
 
 
     dataCallback(data) {
         let shouldAttach = !!data;
-        if (detachedElementContainer.isAttached(this.#element) && !shouldAttach) {
-            detachedElementContainer.detach(this.#element, `Removed by: ${this.tagName}; Expression: ${this.binding}`);
-        } else if (!detachedElementContainer.isAttached(this.#element)  && shouldAttach) {
+        if (this.#element.isAttached && !shouldAttach) {
+            this.#element.detach(`Removed by: ${this.tagName}; Expression: ${this.binding}`);
+        } else if (!this.#element.isAttached  && shouldAttach) {
             this.#toInsert = this.#originalElement.cloneNode(true);
-            detachedElementContainer.attachReplacement(this.#element, this.#toInsert);
+            this.#element.attachReplacement(this.#toInsert);
             this.#element = this.#toInsert;
         }
 
@@ -1586,234 +1585,177 @@ const getComponentContext = (element) => {
     return null;
 };
 
-class exComponent extends HTMLElement {
-    newContext = false;
-    get scope() {
-        return this.context.getScopedVariablesObj();
-    }
-
-    get context() {
-        this._context = this._context || getComponentContext(this);
-        return this._context
-    }
-    set context(value) {
-        this._context = value;
-    }
-
-    get attributeManager() {
-        this._attributeManager = this._attributeManager || new elementAttributeManager();
-        return this._attributeManager;
-    }
-
-    set attributeManager(value) {
-        this._attributeManager = value;
-    }
-
-    get hasContext() {
-        return !!this._context;
-    }
-
-    createContext(newScope) {
-        if (!this._context) {
-            let parentScope = newScope ? [] : (this.context?.scopedVariables || []);
-            this._context = new context(parentScope);
+const exElementFactory = (baseClass) => {
+    return class extends baseClass {
+        get context() {
+            this._context = this._context || getComponentContext(this);
+            return this._context
         }
-    }
+        set context(value) {
+            this._context = value;
+        }
 
-    async connectedCallback() {
-        if (this.isConnected) {
-            console.log("component");
-            this.newContext && this.createContext(this.newContext);
+        get attributeManager() {
+            this._attributeManager = this._attributeManager || new elementAttributeManager();
+            return this._attributeManager;
+        }
+
+        set attributeManager(value) {
+            this._attributeManager = value;
+        }
+
+        get hasContext() {
+            return !!this._context;
+        }
+
+        get isAttached(){
+            return detachedElementContainer.isAttached(this);
+        }
+
+        createContext(newScope) {
+            if (!this._context) {
+                let parentScope = newScope ? [] : (this.context?.scopedVariables || []);
+                this._context = new context(parentScope);
+            }
+        }
+
+        async connectedCallback() {
             await this.attributeManager.connectedCallback(this);
-            this.onConnected && this.onConnected();
+        }
+
+        disconnectedCallback() {
+            this.attributeManager.disconnectedCallback(this);
+            detachedElementContainer.parentDisconnected(this);
+        }
+
+        persistInstance() {
+            detachedElementContainer.addElement(this.parentElement, this);
+        }
+
+        detach(comment = "Detached Element"){
+            detachedElementContainer.detach(this, comment);
+        }
+
+        attach(){
+            detachedElementContainer.attach(this);
+        }
+
+        attachReplacement(replacement){
+            detachedElementContainer.attachReplacement(this, replacement);
         }
     }
+};
 
-    disconnectedCallback() {
-        this.attributeManager.disconnectedCallback(this);
-        detachedElementContainer.parentDisconnected(this);
-        this.onDisconnected && this.onDisconnected();
-    }
-
-}
-
-class exIncludeHtml extends exComponent {
-    async onConnected() {
-        if (typeof this.src !== "string") throw "Include src not note.";
-        const htmlRequest = new Request(this.src); 
-        const response = await fetch(htmlRequest);
-        if (response.ok){
-            let html = await response.text();
-            this.innerHTML = html;
-        }
-    }
-}
-
-customElements.define('ex-include', exIncludeHtml);
-
-class exElement  
-{
-
-    get context() {
-        this._context = this._context || getComponentContext(this);
-        return this._context
-    }
-    set context(value) {
-        this._context =  value;
-    }
-
-    get attributeManager() {
-        this._attributeManager = this._attributeManager || new elementAttributeManager();
-        return this._attributeManager;
-    }
-
-    set attributeManager(value) {
-        this._attributeManager = value;
-    }
-
-    get hasContext() {
-        return !!this._context;
-    }
-
-    createContext(newScope) {
-        if (!this._context) {
-            let parentScope =  newScope ? [] : (this.context?.scopedVariables || []);
-            this._context = new context(parentScope);
-        }
-    }
-
-    async connectedCallback() {
-        await this.attributeManager.connectedCallback(this);
-    }
-
-    disconnectedCallback() {
-        this.attributeManager.disconnectedCallback(this);
-        detachedElementContainer.parentDisconnected(this);
-    }
-
-    static InheritFrom(classDef) {
-        Object.getOwnPropertyNames(exElement.prototype).
-            filter(x => x !== "constructor").
-            forEach(x => Object.defineProperty(classDef.prototype, x, Object.getOwnPropertyDescriptor(exElement.prototype, x)));
-        return classDef;
-    }
-}
-
-customElements.define('ex-a', exElement.InheritFrom(class extends HTMLAnchorElement {}), { extends: "a" });
-customElements.define('ex-abbr', exElement.InheritFrom(class extends HTMLElement {}), { extends: "abbr" });
-customElements.define('ex-acronym', exElement.InheritFrom(class extends HTMLElement {}), { extends: "acronym" });
-customElements.define('ex-address', exElement.InheritFrom(class extends HTMLElement {}), { extends: "address" });
-customElements.define('ex-area', exElement.InheritFrom(class extends HTMLAreaElement {}), { extends: "area" });
-customElements.define('ex-article', exElement.InheritFrom(class extends HTMLElement {}), { extends: "article" });
-customElements.define('ex-aside', exElement.InheritFrom(class extends HTMLElement {}), { extends: "aside" });
-customElements.define('ex-audio', exElement.InheritFrom(class extends HTMLAudioElement {}), { extends: "audio" });
-customElements.define('ex-b', exElement.InheritFrom(class extends HTMLElement {}), { extends: "b" });
-customElements.define('ex-base', exElement.InheritFrom(class extends HTMLBaseElement {}), { extends: "base" });
-customElements.define('ex-basefont', exElement.InheritFrom(class extends HTMLElement {}), { extends: "basefont" });
-customElements.define('ex-bdi', exElement.InheritFrom(class extends HTMLElement {}), { extends: "bdi" });
-customElements.define('ex-bdo', exElement.InheritFrom(class extends HTMLElement {}), { extends: "bdo" });
-customElements.define('ex-big', exElement.InheritFrom(class extends HTMLElement {}), { extends: "big" });
-customElements.define('ex-blockquote', exElement.InheritFrom(class extends HTMLQuoteElement {}), { extends: "blockquote" });
-customElements.define('ex-body', exElement.InheritFrom(class extends HTMLBodyElement {}), { extends: "body" });
-customElements.define('ex-br', exElement.InheritFrom(class extends HTMLBRElement {}), { extends: "br" });
-customElements.define('ex-button', exElement.InheritFrom(class extends HTMLButtonElement {}), { extends: "button" });
-customElements.define('ex-canvas', exElement.InheritFrom(class extends HTMLCanvasElement {}), { extends: "canvas" });
-customElements.define('ex-caption', exElement.InheritFrom(class extends HTMLTableCaptionElement {}), { extends: "caption" });
-customElements.define('ex-center', exElement.InheritFrom(class extends HTMLElement {}), { extends: "center" });
-customElements.define('ex-cite', exElement.InheritFrom(class extends HTMLElement {}), { extends: "cite" });
-customElements.define('ex-code', exElement.InheritFrom(class extends HTMLElement {}), { extends: "code" });
-customElements.define('ex-col', exElement.InheritFrom(class extends HTMLTableColElement {}), { extends: "col" });
-customElements.define('ex-colgroup', exElement.InheritFrom(class extends HTMLTableColElement {}), { extends: "colgroup" });
-customElements.define('ex-data', exElement.InheritFrom(class extends HTMLDataElement {}), { extends: "data" });
-customElements.define('ex-datalist', exElement.InheritFrom(class extends HTMLDataListElement {}), { extends: "datalist" });
-customElements.define('ex-dd', exElement.InheritFrom(class extends HTMLElement {}), { extends: "dd" });
-customElements.define('ex-del', exElement.InheritFrom(class extends HTMLModElement {}), { extends: "del" });
-customElements.define('ex-details', exElement.InheritFrom(class extends HTMLDetailsElement {}), { extends: "details" });
-customElements.define('ex-dfn', exElement.InheritFrom(class extends HTMLElement {}), { extends: "dfn" });
-customElements.define('ex-dialog', exElement.InheritFrom(class extends HTMLDialogElement {}), { extends: "dialog" });
-customElements.define('ex-dir', exElement.InheritFrom(class extends HTMLDirectoryElement {}), { extends: "dir" });
-customElements.define('ex-div', exElement.InheritFrom(class extends HTMLDivElement {}), { extends: "div" });
-customElements.define('ex-dl', exElement.InheritFrom(class extends HTMLDListElement {}), { extends: "dl" });
-customElements.define('ex-dt', exElement.InheritFrom(class extends HTMLElement {}), { extends: "dt" });
-customElements.define('ex-em', exElement.InheritFrom(class extends HTMLElement {}), { extends: "em" });
-customElements.define('ex-embed', exElement.InheritFrom(class extends HTMLEmbedElement {}), { extends: "embed" });
-customElements.define('ex-fieldset', exElement.InheritFrom(class extends HTMLFieldSetElement {}), { extends: "fieldset" });
-customElements.define('ex-figcaption', exElement.InheritFrom(class extends HTMLElement {}), { extends: "figcaption" });
-customElements.define('ex-figure', exElement.InheritFrom(class extends HTMLElement {}), { extends: "figure" });
-customElements.define('ex-font', exElement.InheritFrom(class extends HTMLFontElement {}), { extends: "font" });
-customElements.define('ex-footer', exElement.InheritFrom(class extends HTMLElement {}), { extends: "footer" });
-customElements.define('ex-form', exElement.InheritFrom(class extends HTMLFormElement {}), { extends: "form" });
-customElements.define('ex-frame', exElement.InheritFrom(class extends HTMLFrameElement {}), { extends: "frame" });
-customElements.define('ex-frameset', exElement.InheritFrom(class extends HTMLFrameSetElement {}), { extends: "frameset" });
-customElements.define('ex-head', exElement.InheritFrom(class extends HTMLHeadElement {}), { extends: "head" });
-customElements.define('ex-header', exElement.InheritFrom(class extends HTMLElement {}), { extends: "header" });
-customElements.define('ex-hr', exElement.InheritFrom(class extends HTMLHRElement {}), { extends: "hr" });
-customElements.define('ex-html', exElement.InheritFrom(class extends HTMLHtmlElement {}), { extends: "html" });
-customElements.define('ex-i', exElement.InheritFrom(class extends HTMLElement {}), { extends: "i" });
-customElements.define('ex-iframe', exElement.InheritFrom(class extends HTMLIFrameElement {}), { extends: "iframe" });
-customElements.define('ex-img', exElement.InheritFrom(class extends HTMLImageElement {}), { extends: "img" });
-customElements.define('ex-input', exElement.InheritFrom(class extends HTMLInputElement {}), { extends: "input" });
-customElements.define('ex-ins', exElement.InheritFrom(class extends HTMLModElement {}), { extends: "ins" });
-customElements.define('ex-kbd', exElement.InheritFrom(class extends HTMLElement {}), { extends: "kbd" });
-customElements.define('ex-label', exElement.InheritFrom(class extends HTMLLabelElement {}), { extends: "label" });
-customElements.define('ex-legend', exElement.InheritFrom(class extends HTMLLegendElement {}), { extends: "legend" });
-customElements.define('ex-li', exElement.InheritFrom(class extends HTMLLIElement {}), { extends: "li" });
-customElements.define('ex-link', exElement.InheritFrom(class extends HTMLLinkElement {}), { extends: "link" });
-customElements.define('ex-main', exElement.InheritFrom(class extends HTMLElement {}), { extends: "main" });
-customElements.define('ex-map', exElement.InheritFrom(class extends HTMLMapElement {}), { extends: "map" });
-customElements.define('ex-mark', exElement.InheritFrom(class extends HTMLElement {}), { extends: "mark" });
-customElements.define('ex-meta', exElement.InheritFrom(class extends HTMLMetaElement {}), { extends: "meta" });
-customElements.define('ex-meter', exElement.InheritFrom(class extends HTMLMeterElement {}), { extends: "meter" });
-customElements.define('ex-nav', exElement.InheritFrom(class extends HTMLElement {}), { extends: "nav" });
-customElements.define('ex-noframes', exElement.InheritFrom(class extends HTMLElement {}), { extends: "noframes" });
-customElements.define('ex-noscript', exElement.InheritFrom(class extends HTMLElement {}), { extends: "noscript" });
-customElements.define('ex-object', exElement.InheritFrom(class extends HTMLObjectElement {}), { extends: "object" });
-customElements.define('ex-ol', exElement.InheritFrom(class extends HTMLOListElement {}), { extends: "ol" });
-customElements.define('ex-optgroup', exElement.InheritFrom(class extends HTMLOptGroupElement {}), { extends: "optgroup" });
-customElements.define('ex-option', exElement.InheritFrom(class extends HTMLOptionElement {}), { extends: "option" });
-customElements.define('ex-output', exElement.InheritFrom(class extends HTMLOutputElement {}), { extends: "output" });
-customElements.define('ex-p', exElement.InheritFrom(class extends HTMLParagraphElement {}), { extends: "p" });
-customElements.define('ex-param', exElement.InheritFrom(class extends HTMLParamElement {}), { extends: "param" });
-customElements.define('ex-picture', exElement.InheritFrom(class extends HTMLPictureElement {}), { extends: "picture" });
-customElements.define('ex-pre', exElement.InheritFrom(class extends HTMLPreElement {}), { extends: "pre" });
-customElements.define('ex-progress', exElement.InheritFrom(class extends HTMLProgressElement {}), { extends: "progress" });
-customElements.define('ex-q', exElement.InheritFrom(class extends HTMLQuoteElement {}), { extends: "q" });
-customElements.define('ex-rp', exElement.InheritFrom(class extends HTMLElement {}), { extends: "rp" });
-customElements.define('ex-rt', exElement.InheritFrom(class extends HTMLElement {}), { extends: "rt" });
-customElements.define('ex-ruby', exElement.InheritFrom(class extends HTMLElement {}), { extends: "ruby" });
-customElements.define('ex-s', exElement.InheritFrom(class extends HTMLElement {}), { extends: "s" });
-customElements.define('ex-samp', exElement.InheritFrom(class extends HTMLElement {}), { extends: "samp" });
-customElements.define('ex-script', exElement.InheritFrom(class extends HTMLScriptElement {}), { extends: "script" });
-customElements.define('ex-section', exElement.InheritFrom(class extends HTMLElement {}), { extends: "section" });
-customElements.define('ex-select', exElement.InheritFrom(class extends HTMLSelectElement {}), { extends: "select" });
-customElements.define('ex-small', exElement.InheritFrom(class extends HTMLElement {}), { extends: "small" });
-customElements.define('ex-source', exElement.InheritFrom(class extends HTMLSourceElement {}), { extends: "source" });
-customElements.define('ex-span', exElement.InheritFrom(class extends HTMLSpanElement {}), { extends: "span" });
-customElements.define('ex-strike', exElement.InheritFrom(class extends HTMLElement {}), { extends: "strike" });
-customElements.define('ex-strong', exElement.InheritFrom(class extends HTMLElement {}), { extends: "strong" });
-customElements.define('ex-style', exElement.InheritFrom(class extends HTMLStyleElement {}), { extends: "style" });
-customElements.define('ex-sub', exElement.InheritFrom(class extends HTMLElement {}), { extends: "sub" });
-customElements.define('ex-summary', exElement.InheritFrom(class extends HTMLElement {}), { extends: "summary" });
-customElements.define('ex-sup', exElement.InheritFrom(class extends HTMLElement {}), { extends: "sup" });
-customElements.define('ex-table', exElement.InheritFrom(class extends HTMLTableElement {}), { extends: "table" });
-customElements.define('ex-tbody', exElement.InheritFrom(class extends HTMLTableSectionElement {}), { extends: "tbody" });
-customElements.define('ex-td', exElement.InheritFrom(class extends HTMLTableCellElement {}), { extends: "td" });
-customElements.define('ex-template', exElement.InheritFrom(class extends HTMLTemplateElement {}), { extends: "template" });
-customElements.define('ex-textarea', exElement.InheritFrom(class extends HTMLTextAreaElement {}), { extends: "textarea" });
-customElements.define('ex-tfoot', exElement.InheritFrom(class extends HTMLTableSectionElement {}), { extends: "tfoot" });
-customElements.define('ex-th', exElement.InheritFrom(class extends HTMLTableCellElement {}), { extends: "th" });
-customElements.define('ex-thead', exElement.InheritFrom(class extends HTMLTableSectionElement {}), { extends: "thead" });
-customElements.define('ex-time', exElement.InheritFrom(class extends HTMLTimeElement {}), { extends: "time" });
-customElements.define('ex-title', exElement.InheritFrom(class extends HTMLTitleElement {}), { extends: "title" });
-customElements.define('ex-tr', exElement.InheritFrom(class extends HTMLTableRowElement {}), { extends: "tr" });
-customElements.define('ex-track', exElement.InheritFrom(class extends HTMLTrackElement {}), { extends: "track" });
-customElements.define('ex-tt', exElement.InheritFrom(class extends HTMLElement {}), { extends: "tt" });
-customElements.define('ex-u', exElement.InheritFrom(class extends HTMLElement {}), { extends: "u" });
-customElements.define('ex-ul', exElement.InheritFrom(class extends HTMLUListElement {}), { extends: "ul" });
-customElements.define('ex-var', exElement.InheritFrom(class extends HTMLElement {}), { extends: "var" });
-customElements.define('ex-video', exElement.InheritFrom(class extends HTMLVideoElement {}), { extends: "video" });
-customElements.define('ex-wbr', exElement.InheritFrom(class extends HTMLElement {}), { extends: "wbr" });
-
+customElements.define('ex-a', exElementFactory(HTMLAnchorElement), { extends: "a" });
+customElements.define('ex-abbr', exElementFactory(HTMLElement), { extends: "abbr" });
+customElements.define('ex-acronym', exElementFactory(HTMLElement), { extends: "acronym" });
+customElements.define('ex-address', exElementFactory(HTMLElement), { extends: "address" });
+customElements.define('ex-area', exElementFactory(HTMLAreaElement), { extends: "area" });
+customElements.define('ex-article', exElementFactory(HTMLElement), { extends: "article" });
+customElements.define('ex-aside', exElementFactory(HTMLElement), { extends: "aside" });
+customElements.define('ex-audio', exElementFactory(HTMLAudioElement), { extends: "audio" });
+customElements.define('ex-b', exElementFactory(HTMLElement), { extends: "b" });
+customElements.define('ex-base', exElementFactory(HTMLBaseElement), { extends: "base" });
+customElements.define('ex-basefont', exElementFactory(HTMLElement), { extends: "basefont" });
+customElements.define('ex-bdi', exElementFactory(HTMLElement), { extends: "bdi" });
+customElements.define('ex-bdo', exElementFactory(HTMLElement), { extends: "bdo" });
+customElements.define('ex-big', exElementFactory(HTMLElement), { extends: "big" });
+customElements.define('ex-blockquote', exElementFactory(HTMLQuoteElement), { extends: "blockquote" });
+customElements.define('ex-body', exElementFactory(HTMLBodyElement), { extends: "body" });
+customElements.define('ex-br', exElementFactory(HTMLBRElement), { extends: "br" });
+customElements.define('ex-button', exElementFactory(HTMLButtonElement), { extends: "button" });
+customElements.define('ex-canvas', exElementFactory(HTMLCanvasElement), { extends: "canvas" });
+customElements.define('ex-caption', exElementFactory(HTMLTableCaptionElement), { extends: "caption" });
+customElements.define('ex-center', exElementFactory(HTMLElement), { extends: "center" });
+customElements.define('ex-cite', exElementFactory(HTMLElement), { extends: "cite" });
+customElements.define('ex-code', exElementFactory(HTMLElement), { extends: "code" });
+customElements.define('ex-col', exElementFactory(HTMLTableColElement), { extends: "col" });
+customElements.define('ex-colgroup', exElementFactory(HTMLTableColElement), { extends: "colgroup" });
+customElements.define('ex-data', exElementFactory(HTMLDataElement), { extends: "data" });
+customElements.define('ex-datalist', exElementFactory(HTMLDataListElement), { extends: "datalist" });
+customElements.define('ex-dd', exElementFactory(HTMLElement), { extends: "dd" });
+customElements.define('ex-del', exElementFactory(HTMLModElement), { extends: "del" });
+customElements.define('ex-details', exElementFactory(HTMLDetailsElement), { extends: "details" });
+customElements.define('ex-dfn', exElementFactory(HTMLElement), { extends: "dfn" });
+customElements.define('ex-dialog', exElementFactory(HTMLDialogElement), { extends: "dialog" });
+customElements.define('ex-div', exElementFactory(HTMLDivElement), { extends: "div" });
+customElements.define('ex-dl', exElementFactory(HTMLDListElement), { extends: "dl" });
+customElements.define('ex-dt', exElementFactory(HTMLElement), { extends: "dt" });
+customElements.define('ex-em', exElementFactory(HTMLElement), { extends: "em" });
+customElements.define('ex-embed', exElementFactory(HTMLEmbedElement), { extends: "embed" });
+customElements.define('ex-fieldset', exElementFactory(HTMLFieldSetElement), { extends: "fieldset" });
+customElements.define('ex-figcaption', exElementFactory(HTMLElement), { extends: "figcaption" });
+customElements.define('ex-figure', exElementFactory(HTMLElement), { extends: "figure" });
+customElements.define('ex-font', exElementFactory(HTMLFontElement), { extends: "font" });
+customElements.define('ex-footer', exElementFactory(HTMLElement), { extends: "footer" });
+customElements.define('ex-form', exElementFactory(HTMLFormElement), { extends: "form" });
+customElements.define('ex-head', exElementFactory(HTMLHeadElement), { extends: "head" });
+customElements.define('ex-header', exElementFactory(HTMLElement), { extends: "header" });
+customElements.define('ex-hr', exElementFactory(HTMLHRElement), { extends: "hr" });
+customElements.define('ex-html', exElementFactory(HTMLHtmlElement), { extends: "html" });
+customElements.define('ex-i', exElementFactory(HTMLElement), { extends: "i" });
+customElements.define('ex-iframe', exElementFactory(HTMLIFrameElement), { extends: "iframe" });
+customElements.define('ex-img', exElementFactory(HTMLImageElement), { extends: "img" });
+customElements.define('ex-input', exElementFactory(HTMLInputElement), { extends: "input" });
+customElements.define('ex-ins', exElementFactory(HTMLModElement), { extends: "ins" });
+customElements.define('ex-kbd', exElementFactory(HTMLElement), { extends: "kbd" });
+customElements.define('ex-label', exElementFactory(HTMLLabelElement), { extends: "label" });
+customElements.define('ex-legend', exElementFactory(HTMLLegendElement), { extends: "legend" });
+customElements.define('ex-li', exElementFactory(HTMLLIElement), { extends: "li" });
+customElements.define('ex-link', exElementFactory(HTMLLinkElement), { extends: "link" });
+customElements.define('ex-main', exElementFactory(HTMLElement), { extends: "main" });
+customElements.define('ex-map', exElementFactory(HTMLMapElement), { extends: "map" });
+customElements.define('ex-mark', exElementFactory(HTMLElement), { extends: "mark" });
+customElements.define('ex-meta', exElementFactory(HTMLMetaElement), { extends: "meta" });
+customElements.define('ex-meter', exElementFactory(HTMLMeterElement), { extends: "meter" });
+customElements.define('ex-nav', exElementFactory(HTMLElement), { extends: "nav" });
+customElements.define('ex-noframes', exElementFactory(HTMLElement), { extends: "noframes" });
+customElements.define('ex-noscript', exElementFactory(HTMLElement), { extends: "noscript" });
+customElements.define('ex-object', exElementFactory(HTMLObjectElement), { extends: "object" });
+customElements.define('ex-ol', exElementFactory(HTMLOListElement), { extends: "ol" });
+customElements.define('ex-optgroup', exElementFactory(HTMLOptGroupElement), { extends: "optgroup" });
+customElements.define('ex-option', exElementFactory(HTMLOptionElement), { extends: "option" });
+customElements.define('ex-output', exElementFactory(HTMLOutputElement), { extends: "output" });
+customElements.define('ex-p', exElementFactory(HTMLParagraphElement), { extends: "p" });
+customElements.define('ex-picture', exElementFactory(HTMLPictureElement), { extends: "picture" });
+customElements.define('ex-pre', exElementFactory(HTMLPreElement), { extends: "pre" });
+customElements.define('ex-progress', exElementFactory(HTMLProgressElement), { extends: "progress" });
+customElements.define('ex-q', exElementFactory(HTMLQuoteElement), { extends: "q" });
+customElements.define('ex-rp', exElementFactory(HTMLElement), { extends: "rp" });
+customElements.define('ex-rt', exElementFactory(HTMLElement), { extends: "rt" });
+customElements.define('ex-ruby', exElementFactory(HTMLElement), { extends: "ruby" });
+customElements.define('ex-s', exElementFactory(HTMLElement), { extends: "s" });
+customElements.define('ex-samp', exElementFactory(HTMLElement), { extends: "samp" });
+customElements.define('ex-script', exElementFactory(HTMLScriptElement), { extends: "script" });
+customElements.define('ex-section', exElementFactory(HTMLElement), { extends: "section" });
+customElements.define('ex-select', exElementFactory(HTMLSelectElement), { extends: "select" });
+customElements.define('ex-small', exElementFactory(HTMLElement), { extends: "small" });
+customElements.define('ex-source', exElementFactory(HTMLSourceElement), { extends: "source" });
+customElements.define('ex-span', exElementFactory(HTMLSpanElement), { extends: "span" });
+customElements.define('ex-strike', exElementFactory(HTMLElement), { extends: "strike" });
+customElements.define('ex-strong', exElementFactory(HTMLElement), { extends: "strong" });
+customElements.define('ex-style', exElementFactory(HTMLStyleElement), { extends: "style" });
+customElements.define('ex-sub', exElementFactory(HTMLElement), { extends: "sub" });
+customElements.define('ex-summary', exElementFactory(HTMLElement), { extends: "summary" });
+customElements.define('ex-sup', exElementFactory(HTMLElement), { extends: "sup" });
+customElements.define('ex-table', exElementFactory(HTMLTableElement), { extends: "table" });
+customElements.define('ex-tbody', exElementFactory(HTMLTableSectionElement), { extends: "tbody" });
+customElements.define('ex-td', exElementFactory(HTMLTableCellElement), { extends: "td" });
+customElements.define('ex-template', exElementFactory(HTMLTemplateElement), { extends: "template" });
+customElements.define('ex-textarea', exElementFactory(HTMLTextAreaElement), { extends: "textarea" });
+customElements.define('ex-tfoot', exElementFactory(HTMLTableSectionElement), { extends: "tfoot" });
+customElements.define('ex-th', exElementFactory(HTMLTableCellElement), { extends: "th" });
+customElements.define('ex-thead', exElementFactory(HTMLTableSectionElement), { extends: "thead" });
+customElements.define('ex-time', exElementFactory(HTMLTimeElement), { extends: "time" });
+customElements.define('ex-title', exElementFactory(HTMLTitleElement), { extends: "title" });
+customElements.define('ex-tr', exElementFactory(HTMLTableRowElement), { extends: "tr" });
+customElements.define('ex-track', exElementFactory(HTMLTrackElement), { extends: "track" });
+customElements.define('ex-tt', exElementFactory(HTMLElement), { extends: "tt" });
+customElements.define('ex-u', exElementFactory(HTMLElement), { extends: "u" });
+customElements.define('ex-ul', exElementFactory(HTMLUListElement), { extends: "ul" });
+customElements.define('ex-var', exElementFactory(HTMLElement), { extends: "var" });
+customElements.define('ex-video', exElementFactory(HTMLVideoElement), { extends: "video" });
+customElements.define('ex-wbr', exElementFactory(HTMLElement), { extends: "wbr" });
 
 var exCustomElements = null;
 
@@ -1824,4 +1766,4 @@ var exAttributeContainer = new Proxy({
     }
 });
 
-export { exAttributeContainer as attributeContainer, exAttribute, exComponent, exCustomElements as exDiv, exIncludeHtml, stateManager };
+export { exAttributeContainer as attributeContainer, exAttribute, exCustomElements as exDiv, stateManager };

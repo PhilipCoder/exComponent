@@ -28,7 +28,6 @@ class exLoop extends exAttribute {
             this.#toDuplicate.removeAttribute("ex-repeat");
             detachedElementContainer.addElement(this.element.parentElement, this);
             this.#documentElement = this.element.parentElement;
-            //this.element.parentElement.removeChild(this.element);
             detachedElementContainer.detach(this.element, `Removed by: ${this.tagName}; Expression: ${this.binding}`);
         }
         for (let toRemove of this.#duplicatedItems) {

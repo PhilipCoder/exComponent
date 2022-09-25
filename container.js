@@ -1,7 +1,5 @@
 export { default as stateManager } from "./ex-component/state/state-manager.js";
 export { default as exAttribute } from "./ex-attribute/ex-attribute.js"
-export { default as exComponent } from "./ex-component/ex-component.js";
-export { default as exIncludeHtml } from './ex-components/ex-include.js';
 
 export { default as exDiv } from './ex-components/ex-custom-elements.js';
 

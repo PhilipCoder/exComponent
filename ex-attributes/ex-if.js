@@ -17,17 +17,17 @@ class exIf extends exAttribute {
         this.#toInsert = this.element.cloneNode(true);
         this.#element = this.element;
         this.#originalElement = this.element.cloneNode(true);
-        detachedElementContainer.addElement(this.element.parentElement, this);
+        this.element.persistInstance();
     }
 
 
     dataCallback(data) {
         let shouldAttach = !!data;
-        if (detachedElementContainer.isAttached(this.#element) && !shouldAttach) {
-            detachedElementContainer.detach(this.#element, `Removed by: ${this.tagName}; Expression: ${this.binding}`);
-        } else if (!detachedElementContainer.isAttached(this.#element)  && shouldAttach) {
+        if (this.#element.isAttached && !shouldAttach) {
+            this.#element.detach(`Removed by: ${this.tagName}; Expression: ${this.binding}`);
+        } else if (!this.#element.isAttached  && shouldAttach) {
             this.#toInsert = this.#originalElement.cloneNode(true);
-            detachedElementContainer.attachReplacement(this.#element, this.#toInsert);
+            this.#element.attachReplacement(this.#toInsert);
             this.#element = this.#toInsert;
         }
 
