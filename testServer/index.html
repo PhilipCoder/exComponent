@@ -36,8 +36,7 @@
         <div is="ex-div" ex-if="route.path === '/events'" ex-include="/views/events.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/this'" ex-include="/views/this.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/checked'" ex-include="/views/checked.html" class="row"></div>
-        <div is="ex-div" ex-if="route.path === '/hide'" ex-include="/views/hide.html" class="row"></div>
-
+        <div is="ex-include" ex-if="route.path === '/hide'" ex-data-path="'/views/hide.html'" class="row"></div>
     </div>
 </body>
 

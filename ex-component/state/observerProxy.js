@@ -10,7 +10,7 @@ const observableProxy = (name, object, setCallback) => {
                     return result;
                 }
                 lastPathAccessed.push(`${path}.${key}`);
-              //  result = result === undefined  ? {} : result;
+                //  result = result === undefined  ? {} : result;
                 if (typeof result === "object" && result.__objectPath === undefined) {
                     result = new Proxy(result, getHandler(`${path}.${key}`));
                     target[key] = result;
@@ -25,12 +25,7 @@ const observableProxy = (name, object, setCallback) => {
                 return result;
             },
             set(target, prop, value) {
-                if (typeof value === "object") {
-                    if (value.__originalObject) {
-                        throw `State proxy can't be reassigned.`;
-                    }
-                    value = new Proxy(result, getHandler(`${path}.${prop}`));
-                }
+                value = typeof value === "object" ? new Proxy(value.__originalObject ?? value, getHandler(`${path}.${prop}`)) : value;
                 target[prop] = value;
                 setCallback(`${path}.${prop}`);
                 return true;

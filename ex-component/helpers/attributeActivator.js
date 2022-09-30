@@ -15,6 +15,15 @@ class elementAttributeManager{
             name: x.name,
             value: x.value
         }));
+        let dataAttributes = elementAttributes.filter(x => x.name.startsWith("ex-data-"));
+
+        dataAttributes.forEach(x=>{
+            let valueName = x.name.replace("ex-data-","");
+            element.data[valueName] = element.context.executeScopedExpression(x.value);
+        });
+        
+        elementAttributes  = elementAttributes.filter(x => !x.name.startsWith("ex-data-"));
+
         let attributeDefinitions = elementAttributes.
             filter(x => {
                 if (attributeContainer.getAttribute(x.name)) {
