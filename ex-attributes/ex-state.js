@@ -1,5 +1,4 @@
 import exAttribute from "../ex-attribute/ex-attribute.js";
-import stateManager from "../ex-component/state/state-manager.js";
 
 class exState extends exAttribute {
     static Priority = 5;
@@ -21,10 +20,7 @@ class exState extends exAttribute {
             }
 
             module = await this.getModuleInstance(module);
-
-            let stateManagerInstance = new stateManager(scopeVarName);
-            stateManagerInstance.state = module;
-            this.element.context.addVariable(scopeVarName, stateManagerInstance);
+            this.element.addStateObject(scopeVarName, module);
         }
         this.element.innerHTML = innerHTML;
     }

@@ -19,7 +19,7 @@ class exScope extends exAttribute {
             module = await this.getModuleInstance(module);
 
             this.element.createContext();
-            this.element.context.addVariable(scopeVarName, module);
+            this.element.addScopeObject(scopeVarName, module);
         }
     }
 

@@ -2,7 +2,7 @@ import elementAttributeManager from "../ex-component/helpers/attributeActivator.
 import { getComponentContext } from "../ex-component/helpers/state-helpers.js";
 import { context } from "../ex-component/state/context.js";
 import detachedElementContainer from "../ex-component/state/detached-element-container.js";
-
+import stateManager from "../ex-component/state/state-manager.js";
 
 const exElementFactory = (baseClass = HTMLElement) => {
     return class extends baseClass {
@@ -32,6 +32,25 @@ const exElementFactory = (baseClass = HTMLElement) => {
             return this.context.getScopedVariablesObj();
         };
 
+        /** Adds an observable object to the current scope. Object is converted to an observable proxy.
+         * @param {String} stateName 
+         * @param {Object} stateObj 
+         */
+        addStateObject(stateName, stateObj) {
+            if (typeof stateObj != "object") throw "State should be an object.";
+            let stateManagerInstance = new stateManager(stateName);
+            stateManagerInstance.state = stateObj;
+            this.context.addVariable(stateName, stateManagerInstance);
+        }
+
+        /** Adds an object to the current scope.
+         * @param {String} scopeName 
+         * @param {Object} scopeObject 
+         */
+        addScopeObject(scopeName, scopeObject){
+            if (typeof scopeObject != "object") throw "State should be an object.";
+            this.context.addVariable(scopeName, scopeObject);
+        }
 
         /**
          * Element DOM operations.
@@ -87,15 +106,15 @@ const exElementFactory = (baseClass = HTMLElement) => {
             if (this.shouldCreateNewScope) this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
             await this.attributeManager.connectedCallback(this);
             await this.onConnected?.();
-            if (this.templatePath){
+            if (this.templatePath) {
                 await this.loadHTML(this.templatePath);
             }
         }
 
-        async loadHTML(url){
+        async loadHTML(url) {
             if (url) {
                 const response = await fetch(new Request(url));
-                if (response.ok){
+                if (response.ok) {
                     let html = await response.text();
                     this.innerHTML = html;
                 }
