@@ -1,0 +1,12 @@
+import exElementFactory from "../ex-element/ex-element-factory";
+
+class exRequest extends exElementFactory(HTMLDivElement){
+    async onConnected() { 
+        if (!this.data.path){
+            throw 'No path value defined for include.';
+        }
+        const verb = this.data.verb || "GET";
+    }
+}
+
+export default exRequest;

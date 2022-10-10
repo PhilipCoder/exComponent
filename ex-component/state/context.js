@@ -5,8 +5,8 @@ import { arrayToObject } from "../helpers/object.js"
  */
 class context {
     scopedVariables = {};
-    constructor(scopedVariables = {}) {
-        this.scopedVariables = scopedVariables;
+    constructor(scopedVariables = {}, newObjectInstance = false) {
+        this.scopedVariables = newObjectInstance ? Object.assign({}, scopedVariables) : scopedVariables;
     }
     addVariable(name, value) {
         if (typeof value === "string" || typeof value === "number" || typeof value === "undefined") {

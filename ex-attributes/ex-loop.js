@@ -7,7 +7,7 @@ class exLoop extends exAttribute {
     #originalElement = null;
     #toDuplicate = null;
     #documentElement = null
- 
+
 
     dataCallback(data) {
         if (typeof data !== "object") {
@@ -21,8 +21,8 @@ class exLoop extends exAttribute {
         if (!this.#originalElement) {
             let childContext = this.element.context?.getScopedVariables() || {};
             childContext[variableName] = {};
-            this.element.context = new context(childContext);
-            
+            this.element.context = new context(childContext, true);
+
             this.#originalElement = this.element;
             this.#toDuplicate = this.element.cloneNode(true);
             this.#toDuplicate.removeAttribute("ex-repeat");
@@ -34,7 +34,7 @@ class exLoop extends exAttribute {
             this.element.parentElement.removeChild(toRemove);
         }
         this.#duplicatedItems = [];
-       
+
         if (!Array.isArray(loopArray)) {
             console.log("Loop value is not an array.");
             return;
@@ -45,7 +45,7 @@ class exLoop extends exAttribute {
             let toAdd = this.#toDuplicate.cloneNode(true);
             let childContext = this.element.context?.getScopedVariables() || {};
             childContext[variableName] = loopItem;
-            toAdd.context = new context(childContext);
+            toAdd.context = new context(childContext, true);
             this.#documentElement.appendChild(toAdd);
             this.#duplicatedItems.push(toAdd);
         }
