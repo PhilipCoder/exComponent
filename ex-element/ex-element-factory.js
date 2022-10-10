@@ -47,7 +47,7 @@ const exElementFactory = (baseClass = HTMLElement) => {
          * @param {String} scopeName 
          * @param {Object} scopeObject 
          */
-        addScopeObject(scopeName, scopeObject){
+        addScopeObject(scopeName, scopeObject) {
             if (typeof scopeObject != "object") throw "State should be an object.";
             this.context.addVariable(scopeName, scopeObject);
         }
@@ -103,6 +103,10 @@ const exElementFactory = (baseClass = HTMLElement) => {
          * @protected
          */
         async connectedCallback() {
+            if (this.clearInnerHTML) {
+                this.removedHTML = this.innerHTML;
+                this.innerHTML = "";
+            }
             if (this.shouldCreateNewScope) this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
             await this.attributeManager.connectedCallback(this);
             await this.onConnected?.();
@@ -157,6 +161,10 @@ const exElementFactory = (baseClass = HTMLElement) => {
         createContext(newScope, newInstance) {
             this._context = this._context ?? new context(newScope ? [] : (newInstance ? [...(this.context?.scopedVariables || [])] : (this.context?.scopedVariables || [])));
         }
+
+        clearInnerHTML = false
+
+        removedHTML ="";
     }
 };
 

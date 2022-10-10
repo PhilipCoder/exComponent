@@ -27,6 +27,7 @@
                 <li><a href="#/this">Events</a></li>
                 <li><a href="#/hide">Hide</a></li>
                 <li><a href="#/checked">Checked</a></li>
+                <li><a href="#/request">Request</a></li>
             </ol>
         </div>
         <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html" class="row"></div>
@@ -37,6 +38,7 @@
         <div is="ex-div" ex-if="route.path === '/this'" ex-include="/views/this.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/checked'" ex-include="/views/checked.html" class="row"></div>
         <div is="ex-include" ex-if="route.path === '/hide'" ex-data-path="'/views/hide.html'" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/request'" ex-include="/views/request.html" class="row"></div>
     </div>
 </body>
 

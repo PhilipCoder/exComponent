@@ -1554,25 +1554,6 @@ class elementAttributeManager{
 /**
  * @param {HTMLElement} element 
  */
-// const getComponentScope = (element) => {
-//     while (element.parentElement != null) {
-//         element = element.parentElement
-//         if (element.scope != null) return element.scope;
-//     }
-//     return null;
-// }
-
-// /**
-//  * @param {HTMLElement} element 
-//  */
-//  const getComponentState = (element) => {
-//     while (element.parentElement != null) {
-//         element = element.parentElement
-//         if (element.state != null) return element.state;
-//     }
-//     return null;
-// }
-
 const getComponentContext = (element) => {
     while (element.parentElement != null) {
         element = element.parentElement;
@@ -1624,7 +1605,7 @@ const exElementFactory = (baseClass = HTMLElement) => {
          * @param {String} scopeName 
          * @param {Object} scopeObject 
          */
-        addScopeObject(scopeName, scopeObject){
+        addScopeObject(scopeName, scopeObject) {
             if (typeof scopeObject != "object") throw "State should be an object.";
             this.context.addVariable(scopeName, scopeObject);
         }
@@ -1680,6 +1661,10 @@ const exElementFactory = (baseClass = HTMLElement) => {
          * @protected
          */
         async connectedCallback() {
+            if (this.clearInnerHTML) {
+                this.removedHTML = this.innerHTML;
+                this.innerHTML = "";
+            }
             if (this.shouldCreateNewScope) this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
             await this.attributeManager.connectedCallback(this);
             await this.onConnected?.();
@@ -1734,6 +1719,10 @@ const exElementFactory = (baseClass = HTMLElement) => {
         createContext(newScope, newInstance) {
             this._context = this._context ?? new context(newScope ? [] : (newInstance ? [...(this.context?.scopedVariables || [])] : (this.context?.scopedVariables || [])));
         }
+
+        clearInnerHTML = false
+
+        removedHTML ="";
     }
 };
 
@@ -1743,6 +1732,76 @@ class exInclude extends exElementFactory(HTMLDivElement){
             throw 'No path value defined for include.';
         }
         this.loadHTML(this.data.path);
+    }
+}
+
+function buildQuery(userQuery){
+    var query = [];
+    for (var key in userQuery) {
+        query.push(encodeURIComponent(key) + '=' + encodeURIComponent(userQuery[key]));
+    }
+    return (query.length ? '?' + query.join('&') : '');
+}
+
+
+function PostRequest(url, method, queryParameters, parameterObj, headers) {
+    headers['Content-Type'] = 'application/json';
+    let body = {};
+    for (let key in parameterObj) {
+        body = parameterObj[key];
+    }
+    url += buildQuery(queryParameters);
+    return fetch(url, {
+        method: method,
+        mode: 'cors',
+        body: JSON.stringify(body),
+        headers: new Headers(headers)
+    })
+}
+function GetRequest(url, method, parameters, headers) {
+    headers['Content-Type'] = 'application/json';
+    url += buildQuery(parameters);
+    return fetch(url, {
+        method: method,
+        mode: 'cors',
+        headers: new Headers(headers)
+    });
+}
+const requestFunction = function (url, httpVerb = "GET") {
+    return (queryParameters = {}, bodyParameters = {}, headers = {}) => {
+        return new Promise((resolve, reject) => {
+            var promiseCall = httpVerb == "POST" || httpVerb == "PUT" || httpVerb == "PATCH" ?
+                PostRequest(url, httpVerb, queryParameters, bodyParameters, headers) :
+                GetRequest(url, httpVerb, queryParameters, headers);
+
+            promiseCall.then(async response => {
+                response = await response.json();
+                resolve(response);
+            }).catch(error => {
+                reject(error);
+            });
+        });
+    };
+};
+
+class exRequest extends exElementFactory(HTMLDivElement) {
+    #childHTML = "";
+    clearInnerHTML = true;
+    async onConnected() {
+        this.style.display = "none";
+        if (!this.data.path) {
+            throw 'No path value defined for request.';
+        }
+        if (!this.data.result) {
+            throw 'No result target defined for request.';
+        }
+        let request = requestFunction(this.data.path, this.data.verb);
+        if (this.data.func) this.context.executeScopedStatement(`${this.data.func} = request`, { request });
+        request(this.data.query, this.data.body, this.data.headers).
+            then((data) => {
+                this.data.result && this.data.result(data);
+                this.innerHTML = this.removedHTML;
+            });
     }
 }
 
@@ -1858,6 +1917,7 @@ customElements.define('ex-video', exElementFactory(HTMLVideoElement), { extends:
 customElements.define('ex-wbr', exElementFactory(HTMLElement), { extends: "wbr" });
 
 customElements.define("ex-include", exInclude, { extends: "div" });
+customElements.define("ex-request", exRequest, { extends: "div" });
 
 var exCustomElements = null;
 

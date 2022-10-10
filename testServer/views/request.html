@@ -1,0 +1,30 @@
+<h4>Request</h4>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>User Id</th>
+            <th>id</th>
+            <th>Title</th>
+            <th>Body</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr is="ex-tr" ex-repeat="{'person':state.requestResult}">
+            <td is="ex-td" ex-bind="person.userId"></td>
+            <td is="ex-td" ex-bind="person.id"></td>
+            <td is="ex-td" ex-bind="person.title"></td>
+            <td is="ex-td" ex-bind="person.body"></td>
+        </tr>
+    </tbody>
+</table>
+
+<div is="ex-request"
+    ex-data-path="'https://jsonplaceholder.typicode.com/posts'"
+    ex-data-verb="'GET'"
+    ex-data-result="(data)=>state.requestResult = data">
+    <div is="ex-request"
+        ex-data-path="`https://jsonplaceholder.typicode.com/posts/${state.requestResult[0].id}`"
+        ex-data-result="(data)=>alert(data.body)">
+    </div>
+</div>

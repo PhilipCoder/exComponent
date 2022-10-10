@@ -1,5 +1,7 @@
 import exElementFactory from "../ex-element/ex-element-factory";
 import exInclude from "../ex-elements/ex-include.js";
+import exRequest from "../ex-elements/ex-request.js";
+
 
 customElements.define('ex-a', exElementFactory(HTMLAnchorElement), { extends: "a" });
 customElements.define('ex-abbr', exElementFactory(HTMLElement), { extends: "abbr" });
@@ -113,5 +115,6 @@ customElements.define('ex-video', exElementFactory(HTMLVideoElement), { extends:
 customElements.define('ex-wbr', exElementFactory(HTMLElement), { extends: "wbr" });
 
 customElements.define("ex-include", exInclude, { extends: "div" });
+customElements.define("ex-request", exRequest, { extends: "div" });
 
 export default null;
