@@ -1037,7 +1037,7 @@ class exScope extends exAttribute {
             module = await this.getModuleInstance(module);
 
             this.element.createContext();
-            this.element.context.addVariable(scopeVarName, module);
+            this.element.addScopeObject(scopeVarName, module);
         }
     }
 
@@ -1073,10 +1073,7 @@ class exState extends exAttribute {
             }
 
             module = await this.getModuleInstance(module);
-
-            let stateManagerInstance = new stateManager(scopeVarName);
-            stateManagerInstance.state = module;
-            this.element.context.addVariable(scopeVarName, stateManagerInstance);
+            this.element.addStateObject(scopeVarName, module);
         }
         this.element.innerHTML = innerHTML;
     }
@@ -1612,6 +1609,25 @@ const exElementFactory = (baseClass = HTMLElement) => {
             return this.context.getScopedVariablesObj();
         };
 
+        /** Adds an observable object to the current scope. Object is converted to an observable proxy.
+         * @param {String} stateName 
+         * @param {Object} stateObj 
+         */
+        addStateObject(stateName, stateObj) {
+            if (typeof stateObj != "object") throw "State should be an object.";
+            let stateManagerInstance = new stateManager(stateName);
+            stateManagerInstance.state = stateObj;
+            this.context.addVariable(stateName, stateManagerInstance);
+        }
+
+        /** Adds an object to the current scope.
+         * @param {String} scopeName 
+         * @param {Object} scopeObject 
+         */
+        addScopeObject(scopeName, scopeObject){
+            if (typeof scopeObject != "object") throw "State should be an object.";
+            this.context.addVariable(scopeName, scopeObject);
+        }
 
         /**
          * Element DOM operations.
@@ -1667,15 +1683,15 @@ const exElementFactory = (baseClass = HTMLElement) => {
             if (this.shouldCreateNewScope) this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
             await this.attributeManager.connectedCallback(this);
             await this.onConnected?.();
-            if (this.templatePath){
+            if (this.templatePath) {
                 await this.loadHTML(this.templatePath);
             }
         }
 
-        async loadHTML(url){
+        async loadHTML(url) {
             if (url) {
                 const response = await fetch(new Request(url));
-                if (response.ok){
+                if (response.ok) {
                     let html = await response.text();
                     this.innerHTML = html;
                 }
