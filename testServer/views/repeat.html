@@ -8,7 +8,7 @@
         </tr>
     </thead>
     <tbody>
-        <tr is="ex-tr" ex-repeat="{'person':state.allPeople}">
+        <tr is="ex-tr" ex-repeat="let person of state.allPeople">
             <td is="ex-td" ex-bind="person.ID"></td>
             <td is="ex-td" ex-bind="person.JobTitle"></td>
             <td is="ex-td" ex-bind="person.EmailAddress"></td>

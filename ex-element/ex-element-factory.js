@@ -26,6 +26,11 @@ const exElementFactory = (baseClass = HTMLElement) => {
          */
         shouldCreateNewScope = false;
         /**
+        * If set to true, the element will be a virtual element. 
+        * Virtual elements are removed from the DOM as soon as they are connected. When the "onConnected" method resolves, the children of the element is added in it's place.
+        */
+        isVirtual = false;
+        /**
          * Scope object containing the scoped values.
          */
         get scope() {
@@ -88,6 +93,13 @@ const exElementFactory = (baseClass = HTMLElement) => {
              */
             attachReplacement: (replacement) => {
                 detachedElementContainer.attachReplacement(this, replacement);
+            },
+            /**
+            * Replaces a detached element with another elements.
+            * @param {Array<HTMLElement>} replacements 
+            */
+            attachReplacements: (replacements) => {
+                detachedElementContainer.attachReplacements(this, replacements);
             }
         }
 
@@ -103,16 +115,23 @@ const exElementFactory = (baseClass = HTMLElement) => {
          * @protected
          */
         async connectedCallback() {
-            if (this.clearInnerHTML) {
-                this.removedHTML = this.innerHTML;
+            let originalInnerHtml = this.innerHTML;
+            if (this.isVirtual){
                 this.innerHTML = "";
             }
-            if (this.shouldCreateNewScope) this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
+            if (this.shouldCreateNewScope) {
+                this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
+            };
             await this.attributeManager.connectedCallback(this);
+            if (this.isVirtual) this.DOM.detach();
             await this.onConnected?.();
             if (this.templatePath) {
                 await this.loadHTML(this.templatePath);
             }
+            if (this.isVirtual) {
+                this.innerHTML = originalInnerHtml;
+                this.DOM.attachReplacements(Array.from(this.children))
+            };
         }
 
         async loadHTML(url) {
@@ -162,9 +181,8 @@ const exElementFactory = (baseClass = HTMLElement) => {
             this._context = this._context ?? new context(newScope ? [] : (newInstance ? [...(this.context?.scopedVariables || [])] : (this.context?.scopedVariables || [])));
         }
 
-        clearInnerHTML = false
+        #isVirtualElement = false;
 
-        removedHTML ="";
     }
 };
 

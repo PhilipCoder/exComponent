@@ -6,18 +6,21 @@ class exLoop extends exAttribute {
     #duplicatedItems = [];
     #originalElement = null;
     #toDuplicate = null;
-    #documentElement = null
+    #documentElement = null;
+    simpleValue = true;
 
-
+    /**
+     * 
+     * @param {string} data 
+     * @returns 
+     */
     dataCallback(data) {
-        if (typeof data !== "object") {
-            throw `Loop attribute should have object value;`;
-        }
-        if (Object.keys(data).length != 1) {
-            throw `Loop object should have one property`;
-        }
-        let variableName = Object.keys(data)[0];
-        let loopArray = data[variableName];
+        data = data.trim();
+        if (data.indexOf(" ") < 0) throw `Invalid expression for loop: ${data}`;
+        let expressionParts = data.substring(data.indexOf(" ")).trim().split(" of ");
+        if (expressionParts.length != 2) throw `Invalid expression for loop: ${data}`;
+        let variableName = expressionParts[0];
+        let loopArray = this.context.executeScopedExpression(expressionParts[1])
         if (!this.#originalElement) {
             let childContext = this.element.context?.getScopedVariables() || {};
             childContext[variableName] = {};

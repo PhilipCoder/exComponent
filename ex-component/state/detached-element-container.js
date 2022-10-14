@@ -39,7 +39,23 @@ class _detachedElementContainer {
         this.positionMarkerElements.delete(element);
     }
 
-    isAttached(element){
+    attachReplacements(element, replacements) {
+        let positionMarker = this.positionMarkerElements.get(element);
+        if (element.isConnected || !positionMarker) return;
+        if (!Array.isArray(replacements)) {
+            console.log("attachReplacements method need an array of elements to replace with.");
+            return;
+        }
+        let replacementTarget = positionMarker;
+        for (let replacement of replacements) {
+            positionMarker.parentElement.insertBefore(replacement, replacementTarget.nextSibling ||replacementTarget );
+            replacementTarget = replacement;
+        }
+        positionMarker.parentElement.removeChild(positionMarker);
+        this.positionMarkerElements.delete(element);
+    }
+
+    isAttached(element) {
         return !this.positionMarkerElements.get(element);
     }
 }

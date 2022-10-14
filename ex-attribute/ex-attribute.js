@@ -7,6 +7,7 @@ class exAttribute {
     #boundPathObservables = [];
     #boundPathSubscriptions = [];
     tagName = "";
+    simpleValue = false;
 
     /** Instance of the HTML element the attribute is bound to.
      * @type{HTMLElement} 
@@ -97,7 +98,7 @@ class exAttribute {
     }
 
     getData() {
-        return this.context.executeScopedExpression(this.binding);
+        return this.simpleValue ? this.binding : this.context.executeScopedExpression(this.binding);
     }
     
 }

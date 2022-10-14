@@ -917,6 +917,7 @@ class exAttribute {
     #boundPathObservables = [];
     #boundPathSubscriptions = [];
     tagName = "";
+    simpleValue = false;
 
     /** Instance of the HTML element the attribute is bound to.
      * @type{HTMLElement} 
@@ -1007,7 +1008,7 @@ class exAttribute {
     }
 
     getData() {
-        return this.context.executeScopedExpression(this.binding);
+        return this.simpleValue ? this.binding : this.context.executeScopedExpression(this.binding);
     }
     
 }
@@ -1201,7 +1202,23 @@ class _detachedElementContainer {
         this.positionMarkerElements.delete(element);
     }
 
-    isAttached(element){
+    attachReplacements(element, replacements) {
+        let positionMarker = this.positionMarkerElements.get(element);
+        if (element.isConnected || !positionMarker) return;
+        if (!Array.isArray(replacements)) {
+            console.log("attachReplacements method need an array of elements to replace with.");
+            return;
+        }
+        let replacementTarget = positionMarker;
+        for (let replacement of replacements) {
+            positionMarker.parentElement.insertBefore(replacement, replacementTarget.nextSibling ||replacementTarget );
+            replacementTarget = replacement;
+        }
+        positionMarker.parentElement.removeChild(positionMarker);
+        this.positionMarkerElements.delete(element);
+    }
+
+    isAttached(element) {
         return !this.positionMarkerElements.get(element);
     }
 }
@@ -1212,18 +1229,21 @@ class exLoop extends exAttribute {
     #duplicatedItems = [];
     #originalElement = null;
     #toDuplicate = null;
-    #documentElement = null
+    #documentElement = null;
+    simpleValue = true;
 
-
+    /**
+     * 
+     * @param {string} data 
+     * @returns 
+     */
     dataCallback(data) {
-        if (typeof data !== "object") {
-            throw `Loop attribute should have object value;`;
-        }
-        if (Object.keys(data).length != 1) {
-            throw `Loop object should have one property`;
-        }
-        let variableName = Object.keys(data)[0];
-        let loopArray = data[variableName];
+        data = data.trim();
+        if (data.indexOf(" ") < 0) throw `Invalid expression for loop: ${data}`;
+        let expressionParts = data.substring(data.indexOf(" ")).trim().split(" of ");
+        if (expressionParts.length != 2) throw `Invalid expression for loop: ${data}`;
+        let variableName = expressionParts[0];
+        let loopArray = this.context.executeScopedExpression(expressionParts[1]);
         if (!this.#originalElement) {
             let childContext = this.element.context?.getScopedVariables() || {};
             childContext[variableName] = {};
@@ -1584,6 +1604,11 @@ const exElementFactory = (baseClass = HTMLElement) => {
          */
         shouldCreateNewScope = false;
         /**
+        * If set to true, the element will be a virtual element. 
+        * Virtual elements are removed from the DOM as soon as they are connected. When the "onConnected" method resolves, the children of the element is added in it's place.
+        */
+        isVirtual = false;
+        /**
          * Scope object containing the scoped values.
          */
         get scope() {
@@ -1646,6 +1671,13 @@ const exElementFactory = (baseClass = HTMLElement) => {
              */
             attachReplacement: (replacement) => {
                 detachedElementContainer.attachReplacement(this, replacement);
+            },
+            /**
+            * Replaces a detached element with another elements.
+            * @param {Array<HTMLElement>} replacements 
+            */
+            attachReplacements: (replacements) => {
+                detachedElementContainer.attachReplacements(this, replacements);
             }
         }
 
@@ -1661,17 +1693,22 @@ const exElementFactory = (baseClass = HTMLElement) => {
          * @protected
          */
         async connectedCallback() {
-            if (this.clearInnerHTML) {
-                this.removedHTML = this.innerHTML;
+            let originalInnerHtml = this.innerHTML;
+            if (this.isVirtual){
                 this.innerHTML = "";
             }
-            if (this.shouldCreateNewScope) this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
-            await this.attributeManager.connectedCallback(this);
+            if (this.shouldCreateNewScope) {
+                this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
+            }            await this.attributeManager.connectedCallback(this);
+            if (this.isVirtual) this.DOM.detach();
             await this.onConnected?.();
             if (this.templatePath) {
                 await this.loadHTML(this.templatePath);
             }
-        }
+            if (this.isVirtual) {
+                this.innerHTML = originalInnerHtml;
+                this.DOM.attachReplacements(Array.from(this.children));
+            }        }
 
         async loadHTML(url) {
             if (url) {
@@ -1720,9 +1757,8 @@ const exElementFactory = (baseClass = HTMLElement) => {
             this._context = this._context ?? new context(newScope ? [] : (newInstance ? [...(this.context?.scopedVariables || [])] : (this.context?.scopedVariables || [])));
         }
 
-        clearInnerHTML = false
+        #isVirtualElement = false;
 
-        removedHTML ="";
     }
 };
 
@@ -1785,9 +1821,8 @@ const requestFunction = function (url, httpVerb = "GET") {
 };
 
 class exRequest extends exElementFactory(HTMLDivElement) {
-    #childHTML = "";
-    clearInnerHTML = true;
-    async onConnected() {
+    isVirtual = true;
+    onConnected() {
         this.style.display = "none";
         if (!this.data.path) {
             throw 'No path value defined for request.';
@@ -1797,11 +1832,14 @@ class exRequest extends exElementFactory(HTMLDivElement) {
         }
         let request = requestFunction(this.data.path, this.data.verb);
         if (this.data.func) this.context.executeScopedStatement(`${this.data.func} = request`, { request });
-        request(this.data.query, this.data.body, this.data.headers).
-            then((data) => {
-                this.data.result && this.data.result(data);
-                this.innerHTML = this.removedHTML;
-            });
+
+        return new Promise((resolve, reject) => {
+            request(this.data.query, this.data.body, this.data.headers).
+                then((data) => {
+                    this.data.result && this.data.result(data);
+                    resolve();
+                });
+        });
     }
 }
 
