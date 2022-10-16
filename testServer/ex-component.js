@@ -815,21 +815,23 @@ function filter(predicate, thisArg) {
     });
 }
 
+let proxyId = 0;
+let proxyIdSymbol$2 = Symbol.for("proxyIdSymbol");
 const observableProxy = (name, object, setCallback) => {
     if (typeof object !== "object") throw "Proxy object should be an object";
     let lastPathAccessed = [];
 
-    const getHandler = (path) => {
+    const getHandler = (path, value) => {
         let proxyHandler = {
             get(target, key, receiver) {
                 let result = target[key];
-                if (key === "__boundProp") {
+                if (typeof(key) === "symbol" || key === "__boundProp") {
                     return result;
                 }
                 lastPathAccessed.push(`${path}.${key}`);
                 //  result = result === undefined  ? {} : result;
-                if (typeof result === "object" && result.__objectPath === undefined) {
-                    result = new Proxy(result, getHandler(`${path}.${key}`));
+                if (typeof result === "object" && result !== null && result.__objectPath === undefined) {
+                    result = new Proxy(result, getHandler(`${path}.${key}`, result));
                     target[key] = result;
                     return result;
                 }
@@ -842,12 +844,15 @@ const observableProxy = (name, object, setCallback) => {
                 return result;
             },
             set(target, prop, value) {
-                value = typeof value === "object" ? new Proxy(value.__originalObject ?? value, getHandler(`${path}.${prop}`)) : value;
+                value = typeof value === "object" && value !== null ? new Proxy(value.__originalObject ?? value, getHandler(`${path}.${prop}`, value)) : value;
                 target[prop] = value;
                 setCallback(`${path}.${prop}`);
                 return true;
             }
         };
+        if (typeof value === "object" && value !== null && !value[proxyIdSymbol$2]) {
+            value[proxyIdSymbol$2] = proxyId++;
+        }
         return proxyHandler;
     };
     const resetPaths = () => {
@@ -1361,19 +1366,26 @@ class exInclude$1 extends exAttribute {
     }
 }
 
+let proxyIdSymbol$1 = Symbol.for("proxyIdSymbol");
 class exModel extends exAttribute {
     dataCallback(data) {
+        data ??= '';
+        data = data && typeof (data) === "object" && data[proxyIdSymbol$1] ? data[proxyIdSymbol$1] : data;
         this.element.value = data;
+        this.element.refreshModel = () => {
+            this.element.value = data;
+        };
     }
 
     afterConnected() {
-        this.element.addEventListener("input", () => { 
-            this.runEvent(); 
+        this.element.addEventListener("input", () => {
+            this.runEvent();
         });
     }
 
     runEvent() {
-        this.context.executeScopedExpression(`${this.binding} = elementValue`, { elementValue: this.element.value });
+        let value = this.element.tagName.toLowerCase() === "select" ? this.element.selectedOptions[0]?._value : this.element.value ;
+        this.context.executeScopedExpression(`${this.binding} = elementValue`, { elementValue: value });
     }
 }
 
@@ -1479,6 +1491,16 @@ class exClearState extends exAttribute {
     }
 }
 
+let proxyIdSymbol = Symbol.for("proxyIdSymbol");
+class exValue extends exAttribute {
+    dataCallback(data) {
+        this.element._value = data;
+        data = data && typeof (data) === "object" && data[proxyIdSymbol] ? data[proxyIdSymbol] : data;
+        this.element.value = data;
+        this.element.parentElement?.refreshModel?.();
+    }
+}
+
 class _attributeContainer {
     #registeredAttributes = new Map();
     /**
@@ -1525,6 +1547,7 @@ attributeContainer.registerAttribute("ex-href", exHref);
 attributeContainer.registerAttribute("ex-attributes", exHref);
 attributeContainer.registerAttribute("ex-checked", exCheck);
 attributeContainer.registerAttribute("ex-clear-state", exClearState);
+attributeContainer.registerAttribute("ex-value", exValue);
 
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 

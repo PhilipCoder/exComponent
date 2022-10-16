@@ -20,6 +20,7 @@ import exHide from "../../ex-attributes/ex-hide.js";
 import exHref from "../../ex-attributes/ex-href.js";
 import exCheck from "../../ex-attributes/ex-checked.js";
 import exClearState from "../../ex-attributes/ex-clear-scope.js";
+import exValue from "../../ex-attributes/ex-value.js";
 
 
 class _attributeContainer {
@@ -68,5 +69,6 @@ attributeContainer.registerAttribute("ex-href", exHref);
 attributeContainer.registerAttribute("ex-attributes", exHref);
 attributeContainer.registerAttribute("ex-checked", exCheck);
 attributeContainer.registerAttribute("ex-clear-state", exClearState);
+attributeContainer.registerAttribute("ex-value", exValue);
 
 export default attributeContainer;

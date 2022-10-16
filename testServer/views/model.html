@@ -1,4 +1,60 @@
-<h1>Model Example</h1>
+<div class="row mt-1">
+    <div class="col-12">
+        <h6>Text Boxes</h6>
+    </div>
+    
+</div>
 
-<input type="text" is="ex-input" ex-model="state.name"/>
-<input type="text" is="ex-input" ex-model="state.name"/>
+<div class="row">
+    <div class="col-3">
+        <input type="text" is="ex-input" ex-model="state.name" class="form-control" />
+    </div>
+    <div class="col-3">
+        <input type="text" is="ex-input" ex-model="state.name" class="form-control" />
+    </div>
+</div>
+<div class="row mt-1">
+    <div class="col-12">
+        <h6>Select Dropdown</h6>
+    </div>
+    
+</div>
+<div class="row mt-1">
+    <div class="col-3">
+        <select is="ex-select" ex-model="state.dropDownAVal" class="form-control">
+            <option is="ex-option" value="" ex-bind="'Please Select...'"></option>
+            <option is="ex-option" ex-repeat="let item of state.contactMethods" ex-value="item.id" ex-bind="item.label"></option>
+        </select>
+    </div>
+    <div class="col-3">
+        <select is="ex-select" ex-model="state.dropDownBVal" class="form-control">
+            <option is="ex-option" value="" ex-bind="'Please Select...'"></option>
+            <option is="ex-option" ex-repeat="let item of state.contactMethods" ex-value="item.id" ex-bind="item.label"></option>
+        </select>
+    </div>
+</div>
+<div class="row mt-1">
+    <div class="col-3">
+      <label class="form-label" is="ex-label" ex-bind="state.dropDownAVal"></label>
+    </div>
+    <div class="col-3">
+        <div class="col-3">
+            <label class="form-label" is="ex-label" ex-bind="state.dropDownBVal"></label>
+          </div>
+    </div>
+</div>
+<div class="row mt-1">
+    <div class="col-3">
+        <select is="ex-select" ex-model="state.dropDownCVal" class="form-control">
+            <option is="ex-option" value="" ex-bind="'Please Select...'"></option>
+            <option is="ex-option" ex-repeat="let item of state.contactMethods" ex-value="item" ex-bind="item.label"></option>
+        </select>
+    </div>
+</div>
+<div class="row mt-1">
+    <div class="col-3">
+        <div class="col-3">
+            <label class="form-label" is="ex-label" ex-bind="JSON.stringify(state.dropDownCVal)"></label>
+          </div>
+    </div>
+</div>

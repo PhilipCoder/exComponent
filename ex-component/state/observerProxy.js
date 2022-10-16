@@ -1,18 +1,20 @@
+let proxyId = 0;
+let proxyIdSymbol = Symbol.for("proxyIdSymbol");
 const observableProxy = (name, object, setCallback) => {
     if (typeof object !== "object") throw "Proxy object should be an object";
     let lastPathAccessed = [];
 
-    const getHandler = (path) => {
+    const getHandler = (path, value) => {
         let proxyHandler = {
             get(target, key, receiver) {
                 let result = target[key];
-                if (key === "__boundProp") {
+                if (typeof(key) === "symbol" || key === "__boundProp") {
                     return result;
                 }
                 lastPathAccessed.push(`${path}.${key}`);
                 //  result = result === undefined  ? {} : result;
-                if (typeof result === "object" && result.__objectPath === undefined) {
-                    result = new Proxy(result, getHandler(`${path}.${key}`));
+                if (typeof result === "object" && result !== null && result.__objectPath === undefined) {
+                    result = new Proxy(result, getHandler(`${path}.${key}`, result));
                     target[key] = result;
                     return result;
                 }
@@ -25,11 +27,14 @@ const observableProxy = (name, object, setCallback) => {
                 return result;
             },
             set(target, prop, value) {
-                value = typeof value === "object" ? new Proxy(value.__originalObject ?? value, getHandler(`${path}.${prop}`)) : value;
+                value = typeof value === "object" && value !== null ? new Proxy(value.__originalObject ?? value, getHandler(`${path}.${prop}`, value)) : value;
                 target[prop] = value;
                 setCallback(`${path}.${prop}`);
                 return true;
             }
+        }
+        if (typeof value === "object" && value !== null && !value[proxyIdSymbol]) {
+            value[proxyIdSymbol] = proxyId++;
         }
         return proxyHandler;
     };
