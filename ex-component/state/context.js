@@ -1,5 +1,3 @@
-import { arrayToObject } from "../helpers/object.js"
-
 /**
  * The context class is the class  that should contain
  */

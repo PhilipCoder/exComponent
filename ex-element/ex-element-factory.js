@@ -13,6 +13,12 @@ const exElementFactory = (baseClass = HTMLElement) => {
         data = {}
 
         /**
+         * Indicates if data bindings are simple bindings.
+         * @type {object}
+         */
+        dataBindings={}
+
+        /**
          * Path to the HTML template of the element that should be loaded into the InnerHTML
          */
         templatePath = null
@@ -177,8 +183,8 @@ const exElementFactory = (baseClass = HTMLElement) => {
         get hasContext() { return !!this._context; }
 
         /** @protected */
-        createContext(newScope, newInstance) {
-            this._context = this._context ?? new context(newScope ? [] : (newInstance ? [...(this.context?.scopedVariables || [])] : (this.context?.scopedVariables || [])));
+        createContext(newScope, newInstance=false, entriesToKeep = []) {
+            this._context = this._context ?? new context(newScope ? [...entriesToKeep] : (newInstance ? [...(this.context?.scopedVariables || [])] : (this.context?.scopedVariables || [])));
         }
 
         #isVirtualElement = false;

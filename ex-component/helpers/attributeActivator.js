@@ -1,6 +1,6 @@
 // import { getComponentState, getComponentScope } from "./state-helpers.js";
 import { exceptionLogger } from "./exception-logger.js";
-import attributeContainer from "../state/attribute-container.js";
+import attributeContainer from "../../registry/attribute-registry.js";
 
 class elementAttributeManager{
 
@@ -19,7 +19,7 @@ class elementAttributeManager{
 
         dataAttributes.forEach(x=>{
             let valueName = x.name.replace("ex-data-","");
-            element.data[valueName] = element.context.executeScopedExpression(x.value);
+            element.data[valueName] = element.dataBindings[valueName] ? x.value : element.context.executeScopedExpression(x.value);
         });
         
         elementAttributes  = elementAttributes.filter(x => !x.name.startsWith("ex-data-"));

@@ -34,7 +34,6 @@ customElements.define('ex-dd', exElementFactory(HTMLElement), { extends: "dd" })
 customElements.define('ex-del', exElementFactory(HTMLModElement), { extends: "del" });
 customElements.define('ex-details', exElementFactory(HTMLDetailsElement), { extends: "details" });
 customElements.define('ex-dfn', exElementFactory(HTMLElement), { extends: "dfn" });
-customElements.define('ex-dialog', exElementFactory(HTMLDialogElement), { extends: "dialog" });
 customElements.define('ex-div', exElementFactory(HTMLDivElement), { extends: "div" });
 customElements.define('ex-dl', exElementFactory(HTMLDListElement), { extends: "dl" });
 customElements.define('ex-dt', exElementFactory(HTMLElement), { extends: "dt" });

@@ -4,7 +4,7 @@ export default [
   {
     input: '..\\container.js',
     output: {
-      file: 'ex-component.js',
+      file: 'ex-element.js',
       format: 'es'
     },
     plugins: [
@@ -13,7 +13,7 @@ export default [
   }, {
     input: '..\\container.js',
     output: {
-      file: '..\\testServer\\ex-component.js',
+      file: '..\\testServer\\ex-element.js',
       format: 'es'
     },
     plugins: [

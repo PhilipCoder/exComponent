@@ -12,7 +12,6 @@ const observableProxy = (name, object, setCallback) => {
                     return result;
                 }
                 lastPathAccessed.push(`${path}.${key}`);
-                //  result = result === undefined  ? {} : result;
                 if (typeof result === "object" && result !== null && result.__objectPath === undefined) {
                     result = new Proxy(result, getHandler(`${path}.${key}`, result));
                     target[key] = result;
