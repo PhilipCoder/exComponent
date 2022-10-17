@@ -116,4 +116,4 @@ customElements.define('ex-wbr', exElementFactory(HTMLElement), { extends: "wbr" 
 customElements.define("ex-include", exInclude, { extends: "div" });
 customElements.define("ex-request", exRequest, { extends: "div" });
 
-export default null;
+export default customElements;
