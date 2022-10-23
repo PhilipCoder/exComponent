@@ -1,6 +1,6 @@
-import exElementFactory from "../ex-element/ex-element-factory";
-import exInclude from "../ex-elements/ex-include.js";
-import exRequest from "../ex-elements/ex-request.js";
+import exElementFactory from "../framework/base/elementFactory.js";
+import exInclude from "../implementations/ex-elements/ex-include.js";
+import exRequest from "../implementations/ex-elements/ex-request.js";
 
 
 customElements.define('ex-a', exElementFactory(HTMLAnchorElement), { extends: "a" });

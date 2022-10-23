@@ -677,10 +677,87 @@
 
 })();
 
-const exceptionLogger = {
-    logError: (exception) => {
-        throw exception;
+class _detachedElementContainer {
+    detachedElements = new Map();
+    positionMarkerElements = new Map();
+
+    addElement(parentElement, element) {
+        let elements = [...(this.detachedElements.get(parentElement)) || [], element];
+        this.detachedElements.set(parentElement, elements);
     }
+
+    parentDisconnected(element) {
+        this.detachedElements.get(element)?.forEach(element => {
+            element?.disconnectedCallback();
+            element.unbindAttribute && element.unbindAttribute();
+        });
+    }
+
+    detach(element, comment) {
+        if (!element.isConnected) return;
+        let positionMarker = document.createComment(comment || "Position Marker");
+        element.parentElement.insertBefore(positionMarker, element);
+        element.parentElement.removeChild(element);
+        this.addElement(element);
+        this.positionMarkerElements.set(element, positionMarker);
+    }
+
+    attach(element) {
+        let positionMarker = this.positionMarkerElements.get(element);
+        if (element.isConnected || !positionMarker) return;
+        positionMarker.parentElement.insertBefore(element, positionMarker);
+        positionMarker.parentElement.removeChild(positionMarker);
+        this.positionMarkerElements.delete(element);
+    }
+
+    attachReplacement(element, replacement) {
+        let positionMarker = this.positionMarkerElements.get(element);
+        if (element.isConnected || replacement.isConnected || !positionMarker) return;
+        positionMarker.parentElement.insertBefore(replacement, positionMarker);
+        positionMarker.parentElement.removeChild(positionMarker);
+        this.positionMarkerElements.delete(element);
+    }
+
+    attachReplacements(element, replacements) {
+        let positionMarker = this.positionMarkerElements.get(element);
+        if (element.isConnected || !positionMarker) return;
+        if (!Array.isArray(replacements)) {
+            console.log("attachReplacements method need an array of elements to replace with.");
+            return;
+        }
+        let replacementTarget = positionMarker;
+        for (let replacement of replacements) {
+            positionMarker.parentElement.insertBefore(replacement, replacementTarget.nextSibling ||replacementTarget );
+            replacementTarget = replacement;
+        }
+        positionMarker.parentElement.removeChild(positionMarker);
+        this.positionMarkerElements.delete(element);
+    }
+
+    isAttached(element) {
+        return !this.positionMarkerElements.get(element);
+    }
+}
+
+const detachedElementContainer = new _detachedElementContainer();
+
+/**
+ * @param {HTMLElement} element 
+ */
+const getComponentState = (element) => {
+    while (element.parentElement != null) {
+        element = element.parentElement;
+        if (element.scope != null) return element.scope;
+    }
+    return null;
+};
+
+const proxyConstructorFactory = (factory) => {
+    return new Proxy(function () { }, {
+        construct: (target, args) => {
+            return factory(...args);
+        }
+    });
 };
 
 /******************************************************************************
@@ -961,17 +1038,17 @@ function reportUnhandledError(err) {
 
 function noop() { }
 
-var context$1 = null;
+var context = null;
 function errorContext(cb) {
     if (config.useDeprecatedSynchronousErrorHandling) {
-        var isRoot = !context$1;
+        var isRoot = !context;
         if (isRoot) {
-            context$1 = { errorThrown: false, error: null };
+            context = { errorThrown: false, error: null };
         }
         cb();
         if (isRoot) {
-            var _a = context$1, errorThrown = _a.errorThrown, error = _a.error;
-            context$1 = null;
+            var _a = context, errorThrown = _a.errorThrown, error = _a.error;
+            context = null;
             if (errorThrown) {
                 throw error;
             }
@@ -1500,20 +1577,32 @@ function filter(predicate, thisArg) {
     });
 }
 
+/**
+ * Core communicator object between state proxies and state observers
+ */
+const coreCommunicator = {
+    pathMonitoringIndicator: false,
+    pathAccessedObservable: new Subject(),
+    pathChangedObservable: new Subject(),
+    debugNotificationObservable: new Subject()
+};
+
 let proxyId = 0;
 let proxyIdSymbol$2 = Symbol.for("proxyIdSymbol");
-const observableProxy = (name, object, setCallback) => {
+const observableProxyFactory = (name, object) => {
     if (typeof object !== "object") throw "Proxy object should be an object";
-    let lastPathAccessed = [];
 
     const getHandler = (path, value) => {
         let proxyHandler = {
             get(target, key, receiver) {
                 let result = target[key];
-                if (typeof(key) === "symbol" || key === "__boundProp") {
+                if (typeof (key) === "symbol" || key === "__boundProp") {
                     return result;
                 }
-                lastPathAccessed.push(`${path}.${key}`);
+                if (key === "__isProxy") {
+                    return true;
+                }
+                coreCommunicator.pathMonitoringIndicator && coreCommunicator.pathAccessedObservable.next(`${path}.${key}`);
                 if (typeof result === "object" && result !== null && result.__objectPath === undefined) {
                     result = new Proxy(result, getHandler(`${path}.${key}`, result));
                     target[key] = result;
@@ -1528,9 +1617,9 @@ const observableProxy = (name, object, setCallback) => {
                 return result;
             },
             set(target, prop, value) {
-                value = typeof value === "object" && value !== null ? new Proxy(value.__originalObject ?? value, getHandler(`${path}.${prop}`, value)) : value;
+                value = typeof value === "object" && value !== null && !value.__isProxy ? new Proxy(value.__originalObject ?? value, getHandler(`${path}.${prop}`, value)) : value;
                 target[prop] = value;
-                setCallback(`${path}.${prop}`);
+                coreCommunicator.pathChangedObservable.next(`${path}.${prop}`);
                 return true;
             }
         };
@@ -1539,72 +1628,71 @@ const observableProxy = (name, object, setCallback) => {
         }
         return proxyHandler;
     };
-    const resetPaths = () => {
-        lastPathAccessed = [];
-    };
-    const getLastPathAccessed = () => {
-        let result = [...lastPathAccessed];
-        lastPathAccessed = [];
-        return result;
-    };
-    return { proxy: new Proxy(object, getHandler(name)), getLastPathAccessed, resetPaths }
+    return new Proxy(object, getHandler(name));
 };
 
-class stateManager {
-    name = ""
-    constructor(name) {
-        this.name = name;
-    }
-    //Fields
-    __boundProp = "state"
-    #state = null;
-    #getAccessedPaths = null;
-    #resetPaths = null;
+var observerProxy = proxyConstructorFactory(observableProxyFactory);
 
-    accessedPaths = null
-    accessedObservable = new Subject()
-    changedObservable = new Subject()
-
-    //Properties
-    get state() {
-        return this.#state || (this.#state = this.getState());
+/**
+ * Error message class.
+ */
+class error {
+    /**
+     * Creates an error message
+     * @param {string} area 
+     * @param {string} message 
+     */
+    constructor(area, message) {
+        this.area = area;
+        this.message = message;
     }
-    set state(value) {
-        this.#state = this.getState(value);
+    area = null;
+    message = null;
+}
+
+const scopeProxyHandler = {
+    get: (target, key, receiver) => {
+        key === "_target" && target || target[key];
+        return {
+            "_target": () => target,
+            "$": () => {
+                return (expression, scopedValues = {}) => {
+                    let keys = Object.getOwnPropertyNames(target);
+                    let values = keys.map(x => target[x]);
+                    let scopeKeys = Object.getOwnPropertyNames(scopedValues);
+                    let scopeValues = scopeKeys.map(x => scopedValues[x]);
+                    keys = [...keys, ...scopeKeys];
+                    values = [...values, ...scopeValues];
+                    return Function(...keys, `return ${expression}`)(...values);
+                };
+            },
+            "observe":  () => {
+                return (name) => {
+                target[name] = target[name].__isProxy ? target[name] :  new observerProxy(name, target[name]) ;
+            }}
+        }[key]?.() || target[key];
+    },
+    set: (target, prop, value, proxyInstance) => {
+        if (!{ function: false, object: true }[typeof (value)]) {
+            coreCommunicator.debugNotificationObservable.next(new error("Sate", `Invalid value assigned to execution context. Type ${value} not supported.`));
+            return false;
+        }
+        target[prop] = value;
         return true;
     }
+};
 
-    /** Gets a state proxy instance
-     * @param {Object} stateObj 
-     */
-    getState(stateObj = {}) {
-        let that = this;
-        if (this.#state) {
-            Object.keys(this.#state).forEach(x => that.changedObservable.next(x));
-        }
-        const valueSet = (path)=>{
-            that.changedObservable.next(path);
-        };
-        let proxyResult = observableProxy(this.name, stateObj, valueSet);
-        this.#getAccessedPaths = proxyResult.getLastPathAccessed;
-        this.#resetPaths = proxyResult.resetPaths;
-        return proxyResult.proxy;
-    }
+const getScopeObj = (parentScope) => {
+    return parentScope ?? {};
+};
 
-    GetAccessedPaths() {
-        this.#resetPaths();
-        return () => {
-            return this.#getAccessedPaths();
-        };
-    }
-
-}
+const scope = proxyConstructorFactory((parentScope) => new Proxy(getScopeObj(parentScope), scopeProxyHandler));
 
 class exAttribute {
     #boundPaths = new Set();
     #events = [];
-    #boundPathObservables = [];
-    #boundPathSubscriptions = [];
+    #boundPathObservable = null;
+    #boundPathSubscription = null;
     tagName = "";
     simpleValue = false;
 
@@ -1625,8 +1713,8 @@ class exAttribute {
     }
 
 
-    get context() {
-        return this.element.context;
+    get scope() {
+        return this.element.scope;
     }
 
     connectedCallback() {
@@ -1642,8 +1730,8 @@ class exAttribute {
         this.unbindEvents();
     }
 
-    unbindEvents(){
-        for (let eventItem of this.#events){
+    unbindEvents() {
+        for (let eventItem of this.#events) {
             this.element.removeEventListener(eventItem.eventName, eventItem.eventFunction);
         }
     }
@@ -1655,12 +1743,12 @@ class exAttribute {
     }
 
     runEvent(binding = this.binding) {
-        this.context.executeScopedExpression(binding);
+        this.scope.$(binding);
     }
 
     //bound attributes
     unbindAttribute() {
-        this.#boundPathSubscriptions.forEach(x=>x.unsubscribe());
+        this.#boundPathSubscription?.unsubscribe();
     }
 
     // dataCallback(data) {
@@ -1670,41 +1758,37 @@ class exAttribute {
         this.dataCallback(this.getData());
     }
 
-    unsubscribe(){
-        this.#boundPathSubscriptions.forEach(x=>x.unsubscribe());
+    unsubscribe() {
+        this.#boundPathSubscription?.unsubscribe();
     }
 
     bindElement() {
-        let stateManagers = this.context.getOfType(stateManager);
-        let pathFuncs = stateManagers.map(x => ({ stateManager: x, paths: x.GetAccessedPaths() }));
-        let boundValue = this.getData();
-        
-        let paths = [];
-        pathFuncs.forEach(x => x.paths = x.paths());
-        pathFuncs.forEach(x => x.paths.forEach(y => paths.push(y)));
-        paths.forEach(path => {
-            path.split(".").
-                map((x, index, ar) => `${ar.filter((a, b) => b < index).join(".")}${index ? "." : ""}${x}`).
-                forEach(pathSegment => this.#boundPaths.add(pathSegment));
+        coreCommunicator.pathMonitoringIndicator = true;
+        let monitorSubscription = coreCommunicator.pathAccessedObservable.subscribe((path)=>{
+            this.#boundPaths.add(path);
         });
+        let boundValue = this.getData();
+        coreCommunicator.pathMonitoringIndicator = false;
+        monitorSubscription.unsubscribe();
+
         this.dataCallback(boundValue);
-        pathFuncs = pathFuncs.filter(x => x.paths.length > 0);
-        this.#boundPathObservables = pathFuncs.map(x =>
-            x.stateManager.changedObservable.pipe(filter(path => this.#boundPaths.has(path)))
-        );
-        this.#boundPathSubscriptions = this.#boundPathObservables.map(x=>x.subscribe((data) => this.#onDataChanged(data)));
+   
+        this.#boundPathObservable = coreCommunicator.pathChangedObservable.pipe(filter(path => this.#boundPaths.has(path)));
+
+        this.#boundPathSubscription = this.#boundPathObservable.subscribe((data) => this.#onDataChanged(data));
         this.afterConnected && this.afterConnected();
     }
 
     getData() {
-        return this.simpleValue ? this.binding : this.context.executeScopedExpression(this.binding);
+        return this.simpleValue ? this.binding : this.scope.$(this.binding);
     }
-    
+
 }
 
 class exScope extends exAttribute {
     static Priority = 4;
     async connectedCallback() {
+        this.element.createScope();
         let scopeObj = await Function(`return ${this.binding}`)();
         for (let scopeVarName in scopeObj) {
             let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();
@@ -1717,11 +1801,8 @@ class exScope extends exAttribute {
             if (!module) {
                 throw `Module ${this.binding} has an invalid export`;
             }
-
             module = await this.getModuleInstance(module);
-
-            this.element.createContext();
-            this.element.addScopeObject(scopeVarName, module);
+            this.scope[scopeVarName] = module;
         }
     }
 
@@ -1729,9 +1810,9 @@ class exScope extends exAttribute {
     async getModuleInstance(moduleDefinition) {
         if (typeof moduleDefinition === "function") {
             if (moduleDefinition.prototype) {
-                return new moduleDefinition(this.context?.getScopedVariablesObj() || {});
+                return new moduleDefinition(this.state?._target || {});
             }
-            return await moduleDefinition(this.context?.getScopedVariablesObj() || {});
+            return await moduleDefinition(this.state?._target || {});
         }
         return moduleDefinition;
     }
@@ -1741,10 +1822,10 @@ class exState extends exAttribute {
     static Priority = 5;
     async connectedCallback() {
         let innerHTML = this.element.innerHTML;
-        console.log("state");
         this.element.innerHTML = "";
         let scopeObj = await Function(`return ${this.binding}`)();
-        this.element.createContext();
+        this.element.createScope();
+     
         for (let scopeVarName in scopeObj) {
             let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();
             if (Object.keys(module).length === 0) {
@@ -1757,7 +1838,8 @@ class exState extends exAttribute {
             }
 
             module = await this.getModuleInstance(module);
-            this.element.addStateObject(scopeVarName, module);
+            this.scope[scopeVarName] = module;
+            this.scope.observe(scopeVarName);
         }
         this.element.innerHTML = innerHTML;
     }
@@ -1765,9 +1847,9 @@ class exState extends exAttribute {
     async getModuleInstance(moduleDefinition) {
         if (typeof moduleDefinition === "function") {
             if (moduleDefinition.prototype) {
-                return new moduleDefinition(this.context?.getScopedVariablesObj() || {});
+                return new moduleDefinition(this.state?._target || {});
             }
-            return await moduleDefinition(this.context?.getScopedVariablesObj() || {});
+            return await moduleDefinition(this.state?._target || {});
         }
         return moduleDefinition;
     }
@@ -1784,129 +1866,6 @@ class onClick extends exAttribute{
         this.addEvent("click", ()=>{this.runEvent();});
     }
 }
-
-/**
- * The context class is the class  that should contain
- */
-class context {
-    scopedVariables = {};
-    constructor(scopedVariables = {}, newObjectInstance = false) {
-        this.scopedVariables = newObjectInstance ? Object.assign({}, scopedVariables) : scopedVariables;
-    }
-    addVariable(name, value) {
-        if (typeof value === "string" || typeof value === "number" || typeof value === "undefined") {
-            throw "Invalid context type applied";
-        }
-        this.scopedVariables[name] = value;
-    }
-
-    getVariable(name) {
-        return this.scopedVariables[name]
-    }
-
-    getScopedVariablesObj() {
-        let result = Object.assign({}, this.scopedVariables);
-        Object.keys(result).forEach(x => result[x] = result[x].__boundProp ? result[x][result[x].__boundProp] : result[x]);
-        return result;
-    }
-
-    #getScopedVariables() {
-        let scopeNames = Object.keys(this.scopedVariables);
-        let scopeValues = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x].__boundProp ? this.scopedVariables[x][this.scopedVariables[x].__boundProp] : this.scopedVariables[x]);
-        return { scopeNames, scopeValues };
-    }
-
-    executeScopedExpression(expression, parameters = {}) {
-        let scopeVars = this.#getScopedVariables();
-        Object.keys(parameters).forEach(x => { 
-            scopeVars.scopeNames.push(x);
-            scopeVars.scopeValues.push(parameters[x]);
-         });
-        return Function(...scopeVars.scopeNames, `return ${expression}`)(...scopeVars.scopeValues);
-    }
-
-    executeScopedStatement(expression, parameters = {}) {
-        let scopeVars = this.#getScopedVariables();
-        Object.keys(parameters).forEach(x => { 
-            scopeVars.scopeNames.push(x);
-            scopeVars.scopeValues.push(parameters[x]);
-         });
-        return Function(...scopeVars.scopeNames, `${expression}`)(...scopeVars.scopeValues);
-    }
-
-    getOfType(type) {
-        let scopeVars = Object.keys(this.scopedVariables).map(x => this.scopedVariables[x]);
-        return scopeVars.filter(x => x instanceof type);
-    }
-
-    getScopedVariables() {
-        return Object.assign({}, this.scopedVariables);
-    }
-}
-
-class _detachedElementContainer {
-    detachedElements = new Map();
-    positionMarkerElements = new Map();
-
-    addElement(parentElement, element) {
-        let elements = [...(this.detachedElements.get(parentElement)) || [], element];
-        this.detachedElements.set(parentElement, elements);
-    }
-
-    parentDisconnected(element) {
-        this.detachedElements.get(element)?.forEach(element => {
-            element?.disconnectedCallback();
-            element.unbindAttribute && element.unbindAttribute();
-        });
-    }
-
-    detach(element, comment) {
-        if (!element.isConnected) return;
-        let positionMarker = document.createComment(comment || "Position Marker");
-        element.parentElement.insertBefore(positionMarker, element);
-        element.parentElement.removeChild(element);
-        this.addElement(element);
-        this.positionMarkerElements.set(element, positionMarker);
-    }
-
-    attach(element) {
-        let positionMarker = this.positionMarkerElements.get(element);
-        if (element.isConnected || !positionMarker) return;
-        positionMarker.parentElement.insertBefore(element, positionMarker);
-        positionMarker.parentElement.removeChild(positionMarker);
-        this.positionMarkerElements.delete(element);
-    }
-
-    attachReplacement(element, replacement) {
-        let positionMarker = this.positionMarkerElements.get(element);
-        if (element.isConnected || replacement.isConnected || !positionMarker) return;
-        positionMarker.parentElement.insertBefore(replacement, positionMarker);
-        positionMarker.parentElement.removeChild(positionMarker);
-        this.positionMarkerElements.delete(element);
-    }
-
-    attachReplacements(element, replacements) {
-        let positionMarker = this.positionMarkerElements.get(element);
-        if (element.isConnected || !positionMarker) return;
-        if (!Array.isArray(replacements)) {
-            console.log("attachReplacements method need an array of elements to replace with.");
-            return;
-        }
-        let replacementTarget = positionMarker;
-        for (let replacement of replacements) {
-            positionMarker.parentElement.insertBefore(replacement, replacementTarget.nextSibling ||replacementTarget );
-            replacementTarget = replacement;
-        }
-        positionMarker.parentElement.removeChild(positionMarker);
-        this.positionMarkerElements.delete(element);
-    }
-
-    isAttached(element) {
-        return !this.positionMarkerElements.get(element);
-    }
-}
-
-const detachedElementContainer = new _detachedElementContainer();
 
 class exLoop extends exAttribute {
     #duplicatedItems = [];
@@ -1926,11 +1885,11 @@ class exLoop extends exAttribute {
         let expressionParts = data.substring(data.indexOf(" ")).trim().split(" of ");
         if (expressionParts.length != 2) throw `Invalid expression for loop: ${data}`;
         let variableName = expressionParts[0];
-        let loopArray = this.context.executeScopedExpression(expressionParts[1]);
+        let loopArray = this.scope.$(expressionParts[1]);
         if (!this.#originalElement) {
-            let childContext = this.element.context?.getScopedVariables() || {};
+            let childContext = this.scope._target || {};
             childContext[variableName] = {};
-            this.element.context = new context(childContext, true);
+            this.element.createScope(true,true);
 
             this.#originalElement = this.element;
             this.#toDuplicate = this.element.cloneNode(true);
@@ -1952,9 +1911,9 @@ class exLoop extends exAttribute {
         for (let index = 0; index < loopArray.length; index++) {
             let loopItem = loopArray[index];
             let toAdd = this.#toDuplicate.cloneNode(true);
-            let childContext = this.element.context?.getScopedVariables() || {};
+            let childContext = this.scope._target || {};
             childContext[variableName] = loopItem;
-            toAdd.context = new context(childContext, true);
+            toAdd.scope = new scope(childContext);
             this.#documentElement.appendChild(toAdd);
             this.#duplicatedItems.push(toAdd);
         }
@@ -2011,20 +1970,16 @@ const getHashValues = () => {
 
 class exRoute extends exAttribute {
     static Priority = 3;
-    #urlChangedEvent = null;
     urlChanged(event) {
         console.log(event.state);
     }
 
     connectedCallback() {
         let routeValues = getHashValues();
-        let stateManagerInstance = new stateManager("route");
-        stateManagerInstance.state = { path: routeValues.path };
-        this.element.context.addVariable("route", stateManagerInstance);
-        let attributeInstance = this;
-        window.onpopstate = (event) => {
-            let routeValues = getHashValues();
-            attributeInstance.context.scopedVariables["route"].state.path = routeValues.path;
+        this.scope.route = { path: routeValues.path };
+        this.scope.observe("route");
+        window.onpopstate = () => {
+            this.scope.route.path = getHashValues().path;
         };
     }
 
@@ -2063,7 +2018,7 @@ class exModel extends exAttribute {
 
     runEvent() {
         let value = this.element.tagName.toLowerCase() === "select" ? this.element.selectedOptions[0]?._value : this.element.value ;
-        this.context.executeScopedExpression(`${this.binding} = elementValue`, { elementValue: value });
+        this.scope.$(`${this.binding} = elementValue`, { elementValue: value });
     }
 }
 
@@ -2123,7 +2078,7 @@ class exOn extends exAttribute {
 
 class exThis extends exAttribute {
     async connectedCallback() {
-        this.context.executeScopedStatement(`${this.binding} = ${this.binding}.bind(elm)`, { elm: this.element });
+        this.scope.$(`${this.binding} = ${this.binding}.bind(elm)`, { elm: this.element });
     }
 }
 
@@ -2157,7 +2112,7 @@ class exCheck extends exAttribute {
     runEvent() {
         if ((!!this.element.checked) !== this.#lastValue) {
             this.#lastValue = !!this.element.checked;
-            this.context.executeScopedExpression(`${this.binding} = elementValue`, { elementValue: this.#lastValue });
+            this.scope.$(`${this.binding} = elementValue`, { elementValue: this.#lastValue });
         }
     }
 }
@@ -2165,7 +2120,7 @@ class exCheck extends exAttribute {
 class exClearState extends exAttribute {
     static Priority = 5;
     dataCallback(data) {
-        this.element.createContext(true, true, data ?? []);
+        this.element.createScope(true, true, data ?? []);
     }
 }
 
@@ -2246,7 +2201,7 @@ class elementAttributeManager{
 
         dataAttributes.forEach(x=>{
             let valueName = x.name.replace("ex-data-","");
-            element.data[valueName] = element.dataBindings[valueName] ? x.value : element.context.executeScopedExpression(x.value);
+            element.data[valueName] = element.dataBindings[valueName] ? x.value : element.scope.$(x.value);
         });
         
         elementAttributes  = elementAttributes.filter(x => !x.name.startsWith("ex-data-"));
@@ -2256,7 +2211,7 @@ class elementAttributeManager{
                 if (attributeRegistry.getAttribute(x.name)) {
                     return true;
                 }
-                exceptionLogger.logError(`Attribute named ${x.name} is not found!`);
+                coreCommunicator.debugNotificationObservable.next(new error("Attribute Not Found",`Attribute named ${x.name} is not found!`));
                 return false;
             }).
             map(x => { x.attributeDef = attributeRegistry.getAttribute(x.name); return x }).
@@ -2267,23 +2222,12 @@ class elementAttributeManager{
             attributeInstance.tagName = attributeDef.name;
             this.#attributes.push(attributeInstance);
 
-            await attributeInstance.connectedCallback(element.context);
+            await attributeInstance.connectedCallback(element.scope);
         }
     }
 }
 
-/**
- * @param {HTMLElement} element 
- */
-const getComponentContext = (element) => {
-    while (element.parentElement != null) {
-        element = element.parentElement;
-        if (element.context != null) return element.context;
-    }
-    return null;
-};
-
-const exElementFactory = (baseClass = HTMLElement) => {
+const elementFactory = (baseClass = HTMLElement) => {
     return class extends baseClass {
         /**
          * Object containing values assigned via ex-data attributes.
@@ -2295,7 +2239,7 @@ const exElementFactory = (baseClass = HTMLElement) => {
          * Indicates if data bindings are simple bindings.
          * @type {object}
          */
-        dataBindings={}
+        dataBindings = {}
 
         /**
          * Path to the HTML template of the element that should be loaded into the InnerHTML
@@ -2315,33 +2259,6 @@ const exElementFactory = (baseClass = HTMLElement) => {
         * Virtual elements are removed from the DOM as soon as they are connected. When the "onConnected" method resolves, the children of the element is added in it's place.
         */
         isVirtual = false;
-        /**
-         * Scope object containing the scoped values.
-         */
-        get scope() {
-            return this.context.getScopedVariablesObj();
-        };
-
-        /** Adds an observable object to the current scope. Object is converted to an observable proxy.
-         * @param {String} stateName 
-         * @param {Object} stateObj 
-         */
-        addStateObject(stateName, stateObj) {
-            if (typeof stateObj != "object") throw "State should be an object.";
-            let stateManagerInstance = new stateManager(stateName);
-            stateManagerInstance.state = stateObj;
-            this.context.addVariable(stateName, stateManagerInstance);
-        }
-
-        /** Adds an object to the current scope.
-         * @param {String} scopeName 
-         * @param {Object} scopeObject 
-         */
-        addScopeObject(scopeName, scopeObject) {
-            if (typeof scopeObject != "object") throw "State should be an object.";
-            this.context.addVariable(scopeName, scopeObject);
-        }
-
         /**
          * Element DOM operations.
          */
@@ -2401,11 +2318,11 @@ const exElementFactory = (baseClass = HTMLElement) => {
          */
         async connectedCallback() {
             let originalInnerHtml = this.innerHTML;
-            if (this.isVirtual){
+            if (this.isVirtual) {
                 this.innerHTML = "";
             }
             if (this.shouldCreateNewScope) {
-                this.createContext(this.shouldCreateNewScope, this.shouldInheritScope);
+                this.createScope(this.shouldCreateNewScope,this.shouldInheritScope);
             }            await this.attributeManager.connectedCallback(this);
             if (this.isVirtual) this.DOM.detach();
             await this.onConnected?.();
@@ -2445,10 +2362,10 @@ const exElementFactory = (baseClass = HTMLElement) => {
         }
 
         /** @protected*/
-        get context() { return this._context = this._context || getComponentContext(this); }
+        get scope() { return this._scope = this._scope || getComponentState(this); } //fixed
 
         /** @protected*/
-        set context(value) { this._context = value; }
+        set scope(value) { this._scope = value; } //fixed
 
         /** @protected */
         get attributeManager() { return this._attributeManager = this._attributeManager || new elementAttributeManager(); }
@@ -2457,19 +2374,16 @@ const exElementFactory = (baseClass = HTMLElement) => {
         set attributeManager(value) { this._attributeManager = value; }
 
         /** @protected */
-        get hasContext() { return !!this._context; }
+        get hasScope() { return !!this._scope; } //fixed
 
         /** @protected */
-        createContext(newScope, newInstance=false, entriesToKeep = []) {
-            this._context = this._context ?? new context(newScope ? [...entriesToKeep] : (newInstance ? [...(this.context?.scopedVariables || [])] : (this.context?.scopedVariables || [])));
+        createScope(newScopeObjectInstance, shouldInheritScope, entriesToKeep = {}) {
+            this._scope = newScopeObjectInstance ? new scope(shouldInheritScope ? ({...(this.scope?._target ?? {})}) :  entriesToKeep ) : new scope(this.scope?._target ?? {});
         }
-
-        #isVirtualElement = false;
-
     }
 };
 
-class exInclude extends exElementFactory(HTMLDivElement){
+class exInclude extends elementFactory(HTMLDivElement){
     async onConnected() { 
         if (!this.data.path){
             throw 'No path value defined for include.';
@@ -2527,7 +2441,7 @@ const requestFunction = function (url, httpVerb = "GET") {
     };
 };
 
-class exRequest extends exElementFactory(HTMLDivElement) {
+class exRequest extends elementFactory(HTMLDivElement) {
     isVirtual = true;
     onConnected() {
         this.style.display = "none";
@@ -2538,7 +2452,7 @@ class exRequest extends exElementFactory(HTMLDivElement) {
             throw 'No result target defined for request.';
         }
         let request = requestFunction(this.data.path, this.data.verb);
-        if (this.data.func) this.context.executeScopedStatement(`${this.data.func} = request`, { request });
+        if (this.data.func) this.state.$(`${this.data.func} = request`, { request });
 
         return new Promise((resolve, reject) => {
             request(this.data.query, this.data.body, this.data.headers).
@@ -2550,119 +2464,119 @@ class exRequest extends exElementFactory(HTMLDivElement) {
     }
 }
 
-customElements.define('ex-a', exElementFactory(HTMLAnchorElement), { extends: "a" });
-customElements.define('ex-abbr', exElementFactory(HTMLElement), { extends: "abbr" });
-customElements.define('ex-acronym', exElementFactory(HTMLElement), { extends: "acronym" });
-customElements.define('ex-address', exElementFactory(HTMLElement), { extends: "address" });
-customElements.define('ex-area', exElementFactory(HTMLAreaElement), { extends: "area" });
-customElements.define('ex-article', exElementFactory(HTMLElement), { extends: "article" });
-customElements.define('ex-aside', exElementFactory(HTMLElement), { extends: "aside" });
-customElements.define('ex-audio', exElementFactory(HTMLAudioElement), { extends: "audio" });
-customElements.define('ex-b', exElementFactory(HTMLElement), { extends: "b" });
-customElements.define('ex-base', exElementFactory(HTMLBaseElement), { extends: "base" });
-customElements.define('ex-basefont', exElementFactory(HTMLElement), { extends: "basefont" });
-customElements.define('ex-bdi', exElementFactory(HTMLElement), { extends: "bdi" });
-customElements.define('ex-bdo', exElementFactory(HTMLElement), { extends: "bdo" });
-customElements.define('ex-big', exElementFactory(HTMLElement), { extends: "big" });
-customElements.define('ex-blockquote', exElementFactory(HTMLQuoteElement), { extends: "blockquote" });
-customElements.define('ex-body', exElementFactory(HTMLBodyElement), { extends: "body" });
-customElements.define('ex-br', exElementFactory(HTMLBRElement), { extends: "br" });
-customElements.define('ex-button', exElementFactory(HTMLButtonElement), { extends: "button" });
-customElements.define('ex-canvas', exElementFactory(HTMLCanvasElement), { extends: "canvas" });
-customElements.define('ex-caption', exElementFactory(HTMLTableCaptionElement), { extends: "caption" });
-customElements.define('ex-center', exElementFactory(HTMLElement), { extends: "center" });
-customElements.define('ex-cite', exElementFactory(HTMLElement), { extends: "cite" });
-customElements.define('ex-code', exElementFactory(HTMLElement), { extends: "code" });
-customElements.define('ex-col', exElementFactory(HTMLTableColElement), { extends: "col" });
-customElements.define('ex-colgroup', exElementFactory(HTMLTableColElement), { extends: "colgroup" });
-customElements.define('ex-data', exElementFactory(HTMLDataElement), { extends: "data" });
-customElements.define('ex-datalist', exElementFactory(HTMLDataListElement), { extends: "datalist" });
-customElements.define('ex-dd', exElementFactory(HTMLElement), { extends: "dd" });
-customElements.define('ex-del', exElementFactory(HTMLModElement), { extends: "del" });
-customElements.define('ex-details', exElementFactory(HTMLDetailsElement), { extends: "details" });
-customElements.define('ex-dfn', exElementFactory(HTMLElement), { extends: "dfn" });
-customElements.define('ex-div', exElementFactory(HTMLDivElement), { extends: "div" });
-customElements.define('ex-dl', exElementFactory(HTMLDListElement), { extends: "dl" });
-customElements.define('ex-dt', exElementFactory(HTMLElement), { extends: "dt" });
-customElements.define('ex-em', exElementFactory(HTMLElement), { extends: "em" });
-customElements.define('ex-embed', exElementFactory(HTMLEmbedElement), { extends: "embed" });
-customElements.define('ex-fieldset', exElementFactory(HTMLFieldSetElement), { extends: "fieldset" });
-customElements.define('ex-figcaption', exElementFactory(HTMLElement), { extends: "figcaption" });
-customElements.define('ex-figure', exElementFactory(HTMLElement), { extends: "figure" });
-customElements.define('ex-font', exElementFactory(HTMLFontElement), { extends: "font" });
-customElements.define('ex-footer', exElementFactory(HTMLElement), { extends: "footer" });
-customElements.define('ex-form', exElementFactory(HTMLFormElement), { extends: "form" });
-customElements.define('ex-head', exElementFactory(HTMLHeadElement), { extends: "head" });
-customElements.define('ex-header', exElementFactory(HTMLElement), { extends: "header" });
-customElements.define('ex-hr', exElementFactory(HTMLHRElement), { extends: "hr" });
-customElements.define('ex-html', exElementFactory(HTMLHtmlElement), { extends: "html" });
-customElements.define('ex-i', exElementFactory(HTMLElement), { extends: "i" });
-customElements.define('ex-iframe', exElementFactory(HTMLIFrameElement), { extends: "iframe" });
-customElements.define('ex-img', exElementFactory(HTMLImageElement), { extends: "img" });
-customElements.define('ex-input', exElementFactory(HTMLInputElement), { extends: "input" });
-customElements.define('ex-ins', exElementFactory(HTMLModElement), { extends: "ins" });
-customElements.define('ex-kbd', exElementFactory(HTMLElement), { extends: "kbd" });
-customElements.define('ex-label', exElementFactory(HTMLLabelElement), { extends: "label" });
-customElements.define('ex-legend', exElementFactory(HTMLLegendElement), { extends: "legend" });
-customElements.define('ex-li', exElementFactory(HTMLLIElement), { extends: "li" });
-customElements.define('ex-link', exElementFactory(HTMLLinkElement), { extends: "link" });
-customElements.define('ex-main', exElementFactory(HTMLElement), { extends: "main" });
-customElements.define('ex-map', exElementFactory(HTMLMapElement), { extends: "map" });
-customElements.define('ex-mark', exElementFactory(HTMLElement), { extends: "mark" });
-customElements.define('ex-meta', exElementFactory(HTMLMetaElement), { extends: "meta" });
-customElements.define('ex-meter', exElementFactory(HTMLMeterElement), { extends: "meter" });
-customElements.define('ex-nav', exElementFactory(HTMLElement), { extends: "nav" });
-customElements.define('ex-noframes', exElementFactory(HTMLElement), { extends: "noframes" });
-customElements.define('ex-noscript', exElementFactory(HTMLElement), { extends: "noscript" });
-customElements.define('ex-object', exElementFactory(HTMLObjectElement), { extends: "object" });
-customElements.define('ex-ol', exElementFactory(HTMLOListElement), { extends: "ol" });
-customElements.define('ex-optgroup', exElementFactory(HTMLOptGroupElement), { extends: "optgroup" });
-customElements.define('ex-option', exElementFactory(HTMLOptionElement), { extends: "option" });
-customElements.define('ex-output', exElementFactory(HTMLOutputElement), { extends: "output" });
-customElements.define('ex-p', exElementFactory(HTMLParagraphElement), { extends: "p" });
-customElements.define('ex-picture', exElementFactory(HTMLPictureElement), { extends: "picture" });
-customElements.define('ex-pre', exElementFactory(HTMLPreElement), { extends: "pre" });
-customElements.define('ex-progress', exElementFactory(HTMLProgressElement), { extends: "progress" });
-customElements.define('ex-q', exElementFactory(HTMLQuoteElement), { extends: "q" });
-customElements.define('ex-rp', exElementFactory(HTMLElement), { extends: "rp" });
-customElements.define('ex-rt', exElementFactory(HTMLElement), { extends: "rt" });
-customElements.define('ex-ruby', exElementFactory(HTMLElement), { extends: "ruby" });
-customElements.define('ex-s', exElementFactory(HTMLElement), { extends: "s" });
-customElements.define('ex-samp', exElementFactory(HTMLElement), { extends: "samp" });
-customElements.define('ex-script', exElementFactory(HTMLScriptElement), { extends: "script" });
-customElements.define('ex-section', exElementFactory(HTMLElement), { extends: "section" });
-customElements.define('ex-select', exElementFactory(HTMLSelectElement), { extends: "select" });
-customElements.define('ex-small', exElementFactory(HTMLElement), { extends: "small" });
-customElements.define('ex-source', exElementFactory(HTMLSourceElement), { extends: "source" });
-customElements.define('ex-span', exElementFactory(HTMLSpanElement), { extends: "span" });
-customElements.define('ex-strike', exElementFactory(HTMLElement), { extends: "strike" });
-customElements.define('ex-strong', exElementFactory(HTMLElement), { extends: "strong" });
-customElements.define('ex-style', exElementFactory(HTMLStyleElement), { extends: "style" });
-customElements.define('ex-sub', exElementFactory(HTMLElement), { extends: "sub" });
-customElements.define('ex-summary', exElementFactory(HTMLElement), { extends: "summary" });
-customElements.define('ex-sup', exElementFactory(HTMLElement), { extends: "sup" });
-customElements.define('ex-table', exElementFactory(HTMLTableElement), { extends: "table" });
-customElements.define('ex-tbody', exElementFactory(HTMLTableSectionElement), { extends: "tbody" });
-customElements.define('ex-td', exElementFactory(HTMLTableCellElement), { extends: "td" });
-customElements.define('ex-template', exElementFactory(HTMLTemplateElement), { extends: "template" });
-customElements.define('ex-textarea', exElementFactory(HTMLTextAreaElement), { extends: "textarea" });
-customElements.define('ex-tfoot', exElementFactory(HTMLTableSectionElement), { extends: "tfoot" });
-customElements.define('ex-th', exElementFactory(HTMLTableCellElement), { extends: "th" });
-customElements.define('ex-thead', exElementFactory(HTMLTableSectionElement), { extends: "thead" });
-customElements.define('ex-time', exElementFactory(HTMLTimeElement), { extends: "time" });
-customElements.define('ex-title', exElementFactory(HTMLTitleElement), { extends: "title" });
-customElements.define('ex-tr', exElementFactory(HTMLTableRowElement), { extends: "tr" });
-customElements.define('ex-track', exElementFactory(HTMLTrackElement), { extends: "track" });
-customElements.define('ex-tt', exElementFactory(HTMLElement), { extends: "tt" });
-customElements.define('ex-u', exElementFactory(HTMLElement), { extends: "u" });
-customElements.define('ex-ul', exElementFactory(HTMLUListElement), { extends: "ul" });
-customElements.define('ex-var', exElementFactory(HTMLElement), { extends: "var" });
-customElements.define('ex-video', exElementFactory(HTMLVideoElement), { extends: "video" });
-customElements.define('ex-wbr', exElementFactory(HTMLElement), { extends: "wbr" });
+customElements.define('ex-a', elementFactory(HTMLAnchorElement), { extends: "a" });
+customElements.define('ex-abbr', elementFactory(HTMLElement), { extends: "abbr" });
+customElements.define('ex-acronym', elementFactory(HTMLElement), { extends: "acronym" });
+customElements.define('ex-address', elementFactory(HTMLElement), { extends: "address" });
+customElements.define('ex-area', elementFactory(HTMLAreaElement), { extends: "area" });
+customElements.define('ex-article', elementFactory(HTMLElement), { extends: "article" });
+customElements.define('ex-aside', elementFactory(HTMLElement), { extends: "aside" });
+customElements.define('ex-audio', elementFactory(HTMLAudioElement), { extends: "audio" });
+customElements.define('ex-b', elementFactory(HTMLElement), { extends: "b" });
+customElements.define('ex-base', elementFactory(HTMLBaseElement), { extends: "base" });
+customElements.define('ex-basefont', elementFactory(HTMLElement), { extends: "basefont" });
+customElements.define('ex-bdi', elementFactory(HTMLElement), { extends: "bdi" });
+customElements.define('ex-bdo', elementFactory(HTMLElement), { extends: "bdo" });
+customElements.define('ex-big', elementFactory(HTMLElement), { extends: "big" });
+customElements.define('ex-blockquote', elementFactory(HTMLQuoteElement), { extends: "blockquote" });
+customElements.define('ex-body', elementFactory(HTMLBodyElement), { extends: "body" });
+customElements.define('ex-br', elementFactory(HTMLBRElement), { extends: "br" });
+customElements.define('ex-button', elementFactory(HTMLButtonElement), { extends: "button" });
+customElements.define('ex-canvas', elementFactory(HTMLCanvasElement), { extends: "canvas" });
+customElements.define('ex-caption', elementFactory(HTMLTableCaptionElement), { extends: "caption" });
+customElements.define('ex-center', elementFactory(HTMLElement), { extends: "center" });
+customElements.define('ex-cite', elementFactory(HTMLElement), { extends: "cite" });
+customElements.define('ex-code', elementFactory(HTMLElement), { extends: "code" });
+customElements.define('ex-col', elementFactory(HTMLTableColElement), { extends: "col" });
+customElements.define('ex-colgroup', elementFactory(HTMLTableColElement), { extends: "colgroup" });
+customElements.define('ex-data', elementFactory(HTMLDataElement), { extends: "data" });
+customElements.define('ex-datalist', elementFactory(HTMLDataListElement), { extends: "datalist" });
+customElements.define('ex-dd', elementFactory(HTMLElement), { extends: "dd" });
+customElements.define('ex-del', elementFactory(HTMLModElement), { extends: "del" });
+customElements.define('ex-details', elementFactory(HTMLDetailsElement), { extends: "details" });
+customElements.define('ex-dfn', elementFactory(HTMLElement), { extends: "dfn" });
+customElements.define('ex-div', elementFactory(HTMLDivElement), { extends: "div" });
+customElements.define('ex-dl', elementFactory(HTMLDListElement), { extends: "dl" });
+customElements.define('ex-dt', elementFactory(HTMLElement), { extends: "dt" });
+customElements.define('ex-em', elementFactory(HTMLElement), { extends: "em" });
+customElements.define('ex-embed', elementFactory(HTMLEmbedElement), { extends: "embed" });
+customElements.define('ex-fieldset', elementFactory(HTMLFieldSetElement), { extends: "fieldset" });
+customElements.define('ex-figcaption', elementFactory(HTMLElement), { extends: "figcaption" });
+customElements.define('ex-figure', elementFactory(HTMLElement), { extends: "figure" });
+customElements.define('ex-font', elementFactory(HTMLFontElement), { extends: "font" });
+customElements.define('ex-footer', elementFactory(HTMLElement), { extends: "footer" });
+customElements.define('ex-form', elementFactory(HTMLFormElement), { extends: "form" });
+customElements.define('ex-head', elementFactory(HTMLHeadElement), { extends: "head" });
+customElements.define('ex-header', elementFactory(HTMLElement), { extends: "header" });
+customElements.define('ex-hr', elementFactory(HTMLHRElement), { extends: "hr" });
+customElements.define('ex-html', elementFactory(HTMLHtmlElement), { extends: "html" });
+customElements.define('ex-i', elementFactory(HTMLElement), { extends: "i" });
+customElements.define('ex-iframe', elementFactory(HTMLIFrameElement), { extends: "iframe" });
+customElements.define('ex-img', elementFactory(HTMLImageElement), { extends: "img" });
+customElements.define('ex-input', elementFactory(HTMLInputElement), { extends: "input" });
+customElements.define('ex-ins', elementFactory(HTMLModElement), { extends: "ins" });
+customElements.define('ex-kbd', elementFactory(HTMLElement), { extends: "kbd" });
+customElements.define('ex-label', elementFactory(HTMLLabelElement), { extends: "label" });
+customElements.define('ex-legend', elementFactory(HTMLLegendElement), { extends: "legend" });
+customElements.define('ex-li', elementFactory(HTMLLIElement), { extends: "li" });
+customElements.define('ex-link', elementFactory(HTMLLinkElement), { extends: "link" });
+customElements.define('ex-main', elementFactory(HTMLElement), { extends: "main" });
+customElements.define('ex-map', elementFactory(HTMLMapElement), { extends: "map" });
+customElements.define('ex-mark', elementFactory(HTMLElement), { extends: "mark" });
+customElements.define('ex-meta', elementFactory(HTMLMetaElement), { extends: "meta" });
+customElements.define('ex-meter', elementFactory(HTMLMeterElement), { extends: "meter" });
+customElements.define('ex-nav', elementFactory(HTMLElement), { extends: "nav" });
+customElements.define('ex-noframes', elementFactory(HTMLElement), { extends: "noframes" });
+customElements.define('ex-noscript', elementFactory(HTMLElement), { extends: "noscript" });
+customElements.define('ex-object', elementFactory(HTMLObjectElement), { extends: "object" });
+customElements.define('ex-ol', elementFactory(HTMLOListElement), { extends: "ol" });
+customElements.define('ex-optgroup', elementFactory(HTMLOptGroupElement), { extends: "optgroup" });
+customElements.define('ex-option', elementFactory(HTMLOptionElement), { extends: "option" });
+customElements.define('ex-output', elementFactory(HTMLOutputElement), { extends: "output" });
+customElements.define('ex-p', elementFactory(HTMLParagraphElement), { extends: "p" });
+customElements.define('ex-picture', elementFactory(HTMLPictureElement), { extends: "picture" });
+customElements.define('ex-pre', elementFactory(HTMLPreElement), { extends: "pre" });
+customElements.define('ex-progress', elementFactory(HTMLProgressElement), { extends: "progress" });
+customElements.define('ex-q', elementFactory(HTMLQuoteElement), { extends: "q" });
+customElements.define('ex-rp', elementFactory(HTMLElement), { extends: "rp" });
+customElements.define('ex-rt', elementFactory(HTMLElement), { extends: "rt" });
+customElements.define('ex-ruby', elementFactory(HTMLElement), { extends: "ruby" });
+customElements.define('ex-s', elementFactory(HTMLElement), { extends: "s" });
+customElements.define('ex-samp', elementFactory(HTMLElement), { extends: "samp" });
+customElements.define('ex-script', elementFactory(HTMLScriptElement), { extends: "script" });
+customElements.define('ex-section', elementFactory(HTMLElement), { extends: "section" });
+customElements.define('ex-select', elementFactory(HTMLSelectElement), { extends: "select" });
+customElements.define('ex-small', elementFactory(HTMLElement), { extends: "small" });
+customElements.define('ex-source', elementFactory(HTMLSourceElement), { extends: "source" });
+customElements.define('ex-span', elementFactory(HTMLSpanElement), { extends: "span" });
+customElements.define('ex-strike', elementFactory(HTMLElement), { extends: "strike" });
+customElements.define('ex-strong', elementFactory(HTMLElement), { extends: "strong" });
+customElements.define('ex-style', elementFactory(HTMLStyleElement), { extends: "style" });
+customElements.define('ex-sub', elementFactory(HTMLElement), { extends: "sub" });
+customElements.define('ex-summary', elementFactory(HTMLElement), { extends: "summary" });
+customElements.define('ex-sup', elementFactory(HTMLElement), { extends: "sup" });
+customElements.define('ex-table', elementFactory(HTMLTableElement), { extends: "table" });
+customElements.define('ex-tbody', elementFactory(HTMLTableSectionElement), { extends: "tbody" });
+customElements.define('ex-td', elementFactory(HTMLTableCellElement), { extends: "td" });
+customElements.define('ex-template', elementFactory(HTMLTemplateElement), { extends: "template" });
+customElements.define('ex-textarea', elementFactory(HTMLTextAreaElement), { extends: "textarea" });
+customElements.define('ex-tfoot', elementFactory(HTMLTableSectionElement), { extends: "tfoot" });
+customElements.define('ex-th', elementFactory(HTMLTableCellElement), { extends: "th" });
+customElements.define('ex-thead', elementFactory(HTMLTableSectionElement), { extends: "thead" });
+customElements.define('ex-time', elementFactory(HTMLTimeElement), { extends: "time" });
+customElements.define('ex-title', elementFactory(HTMLTitleElement), { extends: "title" });
+customElements.define('ex-tr', elementFactory(HTMLTableRowElement), { extends: "tr" });
+customElements.define('ex-track', elementFactory(HTMLTrackElement), { extends: "track" });
+customElements.define('ex-tt', elementFactory(HTMLElement), { extends: "tt" });
+customElements.define('ex-u', elementFactory(HTMLElement), { extends: "u" });
+customElements.define('ex-ul', elementFactory(HTMLUListElement), { extends: "ul" });
+customElements.define('ex-var', elementFactory(HTMLElement), { extends: "var" });
+customElements.define('ex-video', elementFactory(HTMLVideoElement), { extends: "video" });
+customElements.define('ex-wbr', elementFactory(HTMLElement), { extends: "wbr" });
 
 customElements.define("ex-include", exInclude, { extends: "div" });
 customElements.define("ex-request", exRequest, { extends: "div" });
 
-var elementRegistry = null;
+var customElements$1 = customElements;
 
-export { attributeRegistry, elementRegistry, exAttribute, exElementFactory, elementRegistry as stateManager };
+export { attributeRegistry, customElements$1 as elementRegistry, exAttribute, elementFactory as exElementFactory, customElements$1 as stateManager };
