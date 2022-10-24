@@ -1717,10 +1717,10 @@ class exAttribute {
         return this.element.scope;
     }
 
-    connectedCallback() {
-        this.onConnected?.();
-        this.init?.();
-        this.dataCallback && this.bindElement();
+    async connectedCallback() {
+        await this.onConnected?.();
+        await this.init?.();
+        await this.dataCallback && this.bindElement();
     }
 
     disconnectedCallback() {
@@ -1787,8 +1787,8 @@ class exAttribute {
 
 class exScope extends exAttribute {
     static Priority = 4;
-    async connectedCallback() {
-        this.element.createScope();
+    async onConnected() {
+        this.element.createScope(true, true);
         let scopeObj = await Function(`return ${this.binding}`)();
         for (let scopeVarName in scopeObj) {
             let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();
@@ -1820,11 +1820,11 @@ class exScope extends exAttribute {
 
 class exState extends exAttribute {
     static Priority = 5;
-    async connectedCallback() {
+    async onConnected() {
         let innerHTML = this.element.innerHTML;
         this.element.innerHTML = "";
         let scopeObj = await Function(`return ${this.binding}`)();
-        this.element.createScope();
+        this.element.createScope(true, true);
      
         for (let scopeVarName in scopeObj) {
             let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();
@@ -1889,7 +1889,7 @@ class exLoop extends exAttribute {
         if (!this.#originalElement) {
             let childContext = this.scope._target || {};
             childContext[variableName] = {};
-            this.element.createScope(true,true);
+           // this.element.createScope(true,true);
 
             this.#originalElement = this.element;
             this.#toDuplicate = this.element.cloneNode(true);
@@ -1913,7 +1913,7 @@ class exLoop extends exAttribute {
             let toAdd = this.#toDuplicate.cloneNode(true);
             let childContext = this.scope._target || {};
             childContext[variableName] = loopItem;
-            toAdd.scope = new scope(childContext);
+            toAdd.scope = new scope({...childContext});
             this.#documentElement.appendChild(toAdd);
             this.#duplicatedItems.push(toAdd);
         }
@@ -1928,7 +1928,7 @@ class exIf extends exAttribute {
     disconnectedCallback() {
     }
 
-    onConnected(){
+    async onConnected(){
         this.element.removeAttribute("ex-if");
         this.#toInsert = this.element.cloneNode(true);
         this.#element = this.element;
@@ -1974,7 +1974,7 @@ class exRoute extends exAttribute {
         console.log(event.state);
     }
 
-    connectedCallback() {
+    async onConnected() {
         let routeValues = getHashValues();
         this.scope.route = { path: routeValues.path };
         this.scope.observe("route");
@@ -1989,7 +1989,7 @@ class exRoute extends exAttribute {
 }
 
 class exInclude$1 extends exAttribute {
-    async connectedCallback() {
+    async onConnected() {
         const htmlRequest = new Request(this.binding); 
         const response = await fetch(htmlRequest);
         if (response.ok){
@@ -2077,7 +2077,7 @@ class exOn extends exAttribute {
 }
 
 class exThis extends exAttribute {
-    async connectedCallback() {
+    async onConnected() {
         this.scope.$(`${this.binding} = ${this.binding}.bind(elm)`, { elm: this.element });
     }
 }
@@ -2227,6 +2227,27 @@ class elementAttributeManager{
     }
 }
 
+class _connectedQueue {
+    stack = [];
+    currentPromise = null;
+    addElement(element) {
+        this.stack.push(element);
+        this.loadNext();
+    }
+
+    loadNext() {
+        if (!this.currentPromise && this.stack.length > 0) {
+            this.currentPromise = this.stack[0].load();
+            this.currentPromise.then(() => {
+                this.stack.shift();
+                this.currentPromise = null;
+                this.loadNext();
+            });
+        }
+    }
+}
+const connectedQueue = new _connectedQueue();
+
 const elementFactory = (baseClass = HTMLElement) => {
     return class extends baseClass {
         /**
@@ -2311,18 +2332,15 @@ const elementFactory = (baseClass = HTMLElement) => {
          */
         async onConnected() { }
 
-        /**
-         * System event when element connected to DOM 
-         * DO NOT OVERRIDE. Use onConnected instead.
-         * @protected
-         */
-        async connectedCallback() {
+        async load(){
+            if (!this.isConnected) return;
+            this._scope = this._scope  ?? getComponentState(this);
             let originalInnerHtml = this.innerHTML;
             if (this.isVirtual) {
                 this.innerHTML = "";
             }
             if (this.shouldCreateNewScope) {
-                this.createScope(this.shouldCreateNewScope,this.shouldInheritScope);
+                this.createScope(this.shouldCreateNewScope, this.shouldInheritScope);
             }            await this.attributeManager.connectedCallback(this);
             if (this.isVirtual) this.DOM.detach();
             await this.onConnected?.();
@@ -2333,6 +2351,14 @@ const elementFactory = (baseClass = HTMLElement) => {
                 this.innerHTML = originalInnerHtml;
                 this.DOM.attachReplacements(Array.from(this.children));
             }        }
+        /**
+         * System event when element connected to DOM 
+         * DO NOT OVERRIDE. Use onConnected instead.
+         * @protected
+         */
+        async connectedCallback() {
+            connectedQueue.addElement(this);
+        }
 
         async loadHTML(url) {
             if (url) {
@@ -2362,7 +2388,7 @@ const elementFactory = (baseClass = HTMLElement) => {
         }
 
         /** @protected*/
-        get scope() { return this._scope = this._scope || getComponentState(this); } //fixed
+        get scope() { return this._scope = this._scope ?? getComponentState(this); } //fixed
 
         /** @protected*/
         set scope(value) { this._scope = value; } //fixed
@@ -2378,7 +2404,7 @@ const elementFactory = (baseClass = HTMLElement) => {
 
         /** @protected */
         createScope(newScopeObjectInstance, shouldInheritScope, entriesToKeep = {}) {
-            this._scope = newScopeObjectInstance ? new scope(shouldInheritScope ? ({...(this.scope?._target ?? {})}) :  entriesToKeep ) : new scope(this.scope?._target ?? {});
+            this._scope = newScopeObjectInstance ? new scope(shouldInheritScope ? ({ ...(this.scope?._target ?? {}) }) : entriesToKeep) : new scope(this.scope?._target ?? {});
         }
     }
 };

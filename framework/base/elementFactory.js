@@ -2,6 +2,7 @@ import detachedElementContainer from "../dom/detached-element-container.js";
 import { getComponentState } from "./helpers/scope-helpers.js";
 import { scope } from "../state-engine/scope.js";
 import elementAttributeManager from "./helpers/attributeActivator.js"
+import { connectedQueue } from "../dom/connected-queue.js";
 
 const elementFactory = (baseClass = HTMLElement) => {
     return class extends baseClass {
@@ -87,18 +88,15 @@ const elementFactory = (baseClass = HTMLElement) => {
          */
         async onConnected() { }
 
-        /**
-         * System event when element connected to DOM 
-         * DO NOT OVERRIDE. Use onConnected instead.
-         * @protected
-         */
-        async connectedCallback() {
+        async load(){
+            if (!this.isConnected) return;
+            this._scope = this._scope  ?? getComponentState(this);
             let originalInnerHtml = this.innerHTML;
             if (this.isVirtual) {
                 this.innerHTML = "";
             }
             if (this.shouldCreateNewScope) {
-                this.createScope(this.shouldCreateNewScope,this.shouldInheritScope);
+                this.createScope(this.shouldCreateNewScope, this.shouldInheritScope);
             };
             await this.attributeManager.connectedCallback(this);
             if (this.isVirtual) this.DOM.detach();
@@ -110,6 +108,14 @@ const elementFactory = (baseClass = HTMLElement) => {
                 this.innerHTML = originalInnerHtml;
                 this.DOM.attachReplacements(Array.from(this.children))
             };
+        }
+        /**
+         * System event when element connected to DOM 
+         * DO NOT OVERRIDE. Use onConnected instead.
+         * @protected
+         */
+        async connectedCallback() {
+            connectedQueue.addElement(this);
         }
 
         async loadHTML(url) {
@@ -140,7 +146,7 @@ const elementFactory = (baseClass = HTMLElement) => {
         }
 
         /** @protected*/
-        get scope() { return this._scope = this._scope || getComponentState(this); } //fixed
+        get scope() { return this._scope = this._scope ?? getComponentState(this); } //fixed
 
         /** @protected*/
         set scope(value) { this._scope = value; } //fixed
@@ -156,7 +162,7 @@ const elementFactory = (baseClass = HTMLElement) => {
 
         /** @protected */
         createScope(newScopeObjectInstance, shouldInheritScope, entriesToKeep = {}) {
-            this._scope = newScopeObjectInstance ? new scope(shouldInheritScope ? ({...(this.scope?._target ?? {})}) :  entriesToKeep ) : new scope(this.scope?._target ?? {});
+            this._scope = newScopeObjectInstance ? new scope(shouldInheritScope ? ({ ...(this.scope?._target ?? {}) }) : entriesToKeep) : new scope(this.scope?._target ?? {});
         }
     }
 };

@@ -2,11 +2,11 @@ import exAttribute from "../../framework/base/ex-attribute.js";
 
 class exState extends exAttribute {
     static Priority = 5;
-    async connectedCallback() {
+    async onConnected() {
         let innerHTML = this.element.innerHTML;
         this.element.innerHTML = "";
         let scopeObj = await Function(`return ${this.binding}`)();
-        this.element.createScope();
+        this.element.createScope(true, true);
      
         for (let scopeVarName in scopeObj) {
             let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();

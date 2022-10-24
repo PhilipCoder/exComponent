@@ -2,8 +2,8 @@ import exAttribute from "../../framework/base/ex-attribute.js";
 
 class exScope extends exAttribute {
     static Priority = 4;
-    async connectedCallback() {
-        this.element.createScope();
+    async onConnected() {
+        this.element.createScope(true, true);
         let scopeObj = await Function(`return ${this.binding}`)();
         for (let scopeVarName in scopeObj) {
             let module = await Function(`return import('${scopeObj[scopeVarName]}')`)();

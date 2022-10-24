@@ -30,10 +30,10 @@ class exAttribute {
         return this.element.scope;
     }
 
-    connectedCallback() {
-        this.onConnected?.();
-        this.init?.();
-        this.dataCallback && this.bindElement();
+    async connectedCallback() {
+        await this.onConnected?.();
+        await this.init?.();
+        await this.dataCallback && this.bindElement();
     }
 
     disconnectedCallback() {

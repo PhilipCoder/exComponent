@@ -1,7 +1,7 @@
 import exAttribute from "../../framework/base/ex-attribute.js";
 
 class exInclude extends exAttribute {
-    async connectedCallback() {
+    async onConnected() {
         const htmlRequest = new Request(this.binding); 
         const response = await fetch(htmlRequest);
         if (response.ok){

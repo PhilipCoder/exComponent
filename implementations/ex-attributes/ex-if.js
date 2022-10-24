@@ -8,7 +8,7 @@ class exIf extends exAttribute {
     disconnectedCallback() {
     }
 
-    onConnected(){
+    async onConnected(){
         this.element.removeAttribute("ex-if");
         this.#toInsert = this.element.cloneNode(true);
         this.#element = this.element;

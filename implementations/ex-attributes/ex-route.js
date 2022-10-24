@@ -7,7 +7,7 @@ class exRoute extends exAttribute {
         console.log(event.state);
     }
 
-    connectedCallback() {
+    async onConnected() {
         let routeValues = getHashValues();
         this.scope.route = { path: routeValues.path };
         this.scope.observe("route");

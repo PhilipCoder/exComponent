@@ -24,7 +24,7 @@ class exLoop extends exAttribute {
         if (!this.#originalElement) {
             let childContext = this.scope._target || {};
             childContext[variableName] = {};
-            this.element.createScope(true,true);
+           // this.element.createScope(true,true);
 
             this.#originalElement = this.element;
             this.#toDuplicate = this.element.cloneNode(true);
@@ -48,7 +48,7 @@ class exLoop extends exAttribute {
             let toAdd = this.#toDuplicate.cloneNode(true);
             let childContext = this.scope._target || {};
             childContext[variableName] = loopItem;
-            toAdd.scope = new scope(childContext);
+            toAdd.scope = new scope({...childContext});
             this.#documentElement.appendChild(toAdd);
             this.#duplicatedItems.push(toAdd);
         }
