@@ -6,7 +6,7 @@ const getComponentState = (element) => {
         element = element.parentElement
         if (element.scope != null) return element.scope;
     }
-    return null;
+    return element.getRootNode()?.scope ?? null;
 }
 
 export { getComponentState };

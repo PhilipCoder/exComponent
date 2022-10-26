@@ -1,7 +1,7 @@
-import exElementFactory from "../../framework/base/elementFactory.js";
+import exElement from "../../framework/base/ex-element.js";
 import { requestFunction } from "../../framework/ui/request.js";
 
-class exRequest extends exElementFactory(HTMLDivElement) {
+class exRequest extends exElement(HTMLDivElement) {
     isVirtual = true;
     onConnected() {
         this.style.display = "none";

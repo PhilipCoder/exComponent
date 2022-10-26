@@ -32,13 +32,13 @@
         </div>
         <div is="ex-div" ex-if="route.path === '/model'" ex-include="/views/model.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/disabled'" ex-include="/views/disabled.html" class="row"></div>
-        <div is="ex-div" ex-if="route.path === '/repeat'" ex-include="/views/repeat.html" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/repeat'" ex-include="/views/repeat.html" class="row" ex-data-shadow="true"></div>
         <div is="ex-div" ex-if="route.path === '/class'" ex-include="/views/class.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/events'" ex-include="/views/events.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/this'" ex-include="/views/this.html" class="row"></div>
         <div is="ex-div" ex-if="route.path === '/checked'" ex-include="/views/checked.html" class="row"></div>
-        <div is="ex-include" ex-if="route.path === '/hide'" ex-data-path="'/views/hide.html'" class="row"></div>
-        <div is="ex-div" ex-if="route.path === '/request'" ex-include="/views/request.html" class="row"></div>
+        <div is="ex-include" ex-if="route.path === '/hide'" ex-data-shadow="true" ex-data-path="'/views/hide.html'" class="row"></div>
+        <div is="ex-div" ex-if="route.path === '/request'"  ex-include="/views/request.html" class="row"></div>
     </div>
 </body>
 

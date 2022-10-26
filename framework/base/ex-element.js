@@ -4,7 +4,7 @@ import { scope } from "../state-engine/scope.js";
 import elementAttributeManager from "./helpers/attributeActivator.js"
 import { connectedQueue } from "../dom/connected-queue.js";
 
-const elementFactory = (baseClass = HTMLElement) => {
+const exElement = (baseClass = HTMLElement) => {
     return class extends baseClass {
         /**
          * Object containing values assigned via ex-data attributes.
@@ -88,9 +88,9 @@ const elementFactory = (baseClass = HTMLElement) => {
          */
         async onConnected() { }
 
-        async load(){
+        async load() {
             if (!this.isConnected) return;
-            this._scope = this._scope  ?? getComponentState(this);
+            this._scope = this._scope ?? getComponentState(this);
             let originalInnerHtml = this.innerHTML;
             if (this.isVirtual) {
                 this.innerHTML = "";
@@ -102,7 +102,7 @@ const elementFactory = (baseClass = HTMLElement) => {
             if (this.isVirtual) this.DOM.detach();
             await this.onConnected?.();
             if (this.templatePath) {
-                await this.loadHTML(this.templatePath);
+                await this.loadHTML(this.templatePath, this.getRootElement());
             }
             if (this.isVirtual) {
                 this.innerHTML = originalInnerHtml;
@@ -118,12 +118,12 @@ const elementFactory = (baseClass = HTMLElement) => {
             connectedQueue.addElement(this);
         }
 
-        async loadHTML(url) {
+        async loadHTML(url, targetElement) {
             if (url) {
                 const response = await fetch(new Request(url));
                 if (response.ok) {
                     let html = await response.text();
-                    this.innerHTML = html;
+                    (targetElement ?? this).innerHTML = html;
                 }
             }
         }
@@ -164,7 +164,15 @@ const elementFactory = (baseClass = HTMLElement) => {
         createScope(newScopeObjectInstance, shouldInheritScope, entriesToKeep = {}) {
             this._scope = newScopeObjectInstance ? new scope(shouldInheritScope ? ({ ...(this.scope?._target ?? {}) }) : entriesToKeep) : new scope(this.scope?._target ?? {});
         }
+        /** @protected */
+        getRootElement() {
+            if (!this.data.shadow)
+                return this;
+            let result = this.attachShadow({ mode: "open" });
+            result.scope = this.scope;
+            return result;
+        }
     }
 };
 
-export default elementFactory;
+export default exElement;

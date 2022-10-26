@@ -6,7 +6,7 @@ class exInclude extends exAttribute {
         const response = await fetch(htmlRequest);
         if (response.ok){
             let html = await response.text();
-            this.element.innerHTML = html;
+            this.element.getRootElement().innerHTML = html;
         }
     }
 }
